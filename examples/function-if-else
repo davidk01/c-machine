@@ -1,0 +1,4 @@
+(def main () int
+  (declare x int 1)
+  (declare y bool)
+  (if x (return 1) (return 2)))

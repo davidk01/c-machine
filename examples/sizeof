@@ -1,0 +1,7 @@
+(struct test a int b int c (ptr int))
+
+(def main () int
+  (declare x int (sizeof int))
+  (declare y int (sizeof int))
+  (declare z int (sizeof float))
+  (return 0))

@@ -1,0 +1,7 @@
+(def main () int 
+  (declare x int 0)
+  (declare y int 0)
+  (declare z int)
+  (set x (+ 1 2 3 (- 1 2 y)))
+  (set y (* 1 2 3 (/ 1 2 3) (- 1 2 3)))
+  (return 1))
