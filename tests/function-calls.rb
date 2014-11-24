@@ -5,7 +5,7 @@ class TestFunctionCalls < MiniTest::Unit::TestCase
 
   def setup
     @code = File.read(File.expand_path(File.dirname(__FILE__) + '/../examples/functions'))
-    @context = CMachineGrammar::CompileData.new
+    @context = CMachineGrammar::CompileContext.new
     @ast = CMachineGrammar.parse(@code)
     @bytecode = @ast.compile(@context)
   end

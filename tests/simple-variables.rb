@@ -5,7 +5,7 @@ class TestSimpleVariables < MiniTest::Unit::TestCase
 
   def setup
     @code = File.read(File.expand_path(File.dirname(__FILE__) + '/../examples/variables'))
-    @context = CMachineGrammar::CompileData.new
+    @context = CMachineGrammar::CompileContext.new
     @ast = CMachineGrammar.parse(@code)
     @ast.compile(@context)
   end

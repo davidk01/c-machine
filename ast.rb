@@ -1,5 +1,5 @@
 require_relative './cmachine'
-require_relative './compiledata'
+require_relative './compilecontext'
 
 I = CMachine::Instruction
 
@@ -25,9 +25,9 @@ module CMachineGrammar
     ##
     # Get the variable data and push the contents on the stack.
 
-    def compile(compile_data)
-      variable_data = compile_data.get_variable_data(self)
-      I[:loada, variable_data.offset, variable_data.declaration.type.size(compile_data)]
+    def compile(compile_context)
+      variable_data = compile_context.get_variable_data(self)
+      I[:loada, variable_data.offset, variable_data.declaration.type.size(compile_context)]
     end
 
   end
@@ -41,16 +41,16 @@ module CMachineGrammar
     ##
     # e.g. :+, :-, :/, :*
 
-    def reduce_with_operation(compile_data, operation)
-      expr = expressions.map {|e| e.compile(compile_data)}
+    def reduce_with_operation(compile_context, operation)
+      expr = expressions.map {|e| e.compile(compile_context)}
       expr[0] + expr[1..-1].map {|e| e + I[operation]}.flatten
     end
 
     ##
     # e.g. :<, :==, :>, etc.
 
-    def reduce_with_comparison(compile_data, comparison)
-      exprs = expressions.map {|e| e.compile(compile_data)}
+    def reduce_with_comparison(compile_context, comparison)
+      exprs = expressions.map {|e| e.compile(compile_context)}
       comparisons = exprs[0...-1].zip(exprs[1..-1]).map {|a, b| a + b + I[comparison]}.flatten
       comparisons + I[:&] * (expressions.length - 2)
     end
@@ -65,11 +65,11 @@ module CMachineGrammar
     # An identifier means we are accessing a variable. So we load the value of the variable
     # on the stack through its address.
 
-    def compile(compile_data)
-      variable_data = compile_data.get_variable_data(value)
+    def compile(compile_context)
+      variable_data = compile_context.get_variable_data(value)
       raise StandardError, "Undefined variable access: #{val}." unless variable_data
       starting_address = variable_data.offset
-      I[:loada, variable_data.offset, variable_data.size(compile_data)]
+      I[:loada, variable_data.offset, variable_data.size(compile_context)]
     end
 
   end
@@ -134,7 +134,7 @@ module CMachineGrammar
     # For each expression in the list of expressions we compile it and then we append n - 1 :- operations,
     # where n is the length of the expressions. e1 e2 e3 ... en :- :- ... :-.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :-); end
+    def compile(compile_context); reduce_with_operation(compile_context, :-); end
 
   end
 
@@ -156,7 +156,7 @@ module CMachineGrammar
     ##
     # Same reasoning as for +DiffExp+ except we use :+.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :+); end
+    def compile(compile_context); reduce_with_operation(compile_context, :+); end
 
   end
 
@@ -165,7 +165,7 @@ module CMachineGrammar
     ##
     # Might need to re-think this since repeated modulo operation doesn't make much sense.
     
-    def compile(compile_data); reduce_with_operation(compile_data, :%); end
+    def compile(compile_context); reduce_with_operation(compile_context, :%); end
 
   end
 
@@ -174,7 +174,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :<<); end
+    def compile(compile_context); reduce_with_operation(compile_context, :<<); end
 
   end
 
@@ -183,7 +183,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :>>); end
+    def compile(compile_context); reduce_with_operation(compile_context, :>>); end
 
   end
 
@@ -211,7 +211,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :*); end
+    def compile(compile_context); reduce_with_operation(compile_context, :*); end
 
   end
 
@@ -231,19 +231,19 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_operation(compile_data, :/); end
+    def compile(compile_context); reduce_with_operation(compile_context, :/); end
 
   end
 
   class AndExp < OpReducers
 
-    def compile(compile_data); reduce_with_operation(compile_data, :&); end
+    def compile(compile_context); reduce_with_operation(compile_context, :&); end
 
   end
 
   class OrExp < OpReducers
 
-    def compile(compile_data); reduce_with_operation(compile_data, :|); end
+    def compile(compile_context); reduce_with_operation(compile_context, :|); end
 
   end
 
@@ -252,7 +252,7 @@ module CMachineGrammar
     ##
     # e1 e2 :< e2 e3 :< e3 e4 :< ... en-1 en :< :& :& ... :&
 
-    def compile(compile_data); reduce_with_comparison(compile_data, :<); end
+    def compile(compile_context); reduce_with_comparison(compile_context, :<); end
 
   end
 
@@ -281,7 +281,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_comparison(compile_data, :<=); end
+    def compile(compile_context); reduce_with_comparison(compile_context, :<=); end
 
   end
 
@@ -290,7 +290,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_comparison(compile_data, :==); end
+    def compile(compile_context); reduce_with_comparison(compile_context, :==); end
 
   end
 
@@ -299,7 +299,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_comparison(compile_data, :>); end
+    def compile(compile_context); reduce_with_comparison(compile_context, :>); end
 
   end
 
@@ -308,7 +308,7 @@ module CMachineGrammar
     ##
     # Same as above.
 
-    def compile(compile_data); reduce_with_comparison(compile_data, :>=); end
+    def compile(compile_context); reduce_with_comparison(compile_context, :>=); end
 
   end
 
@@ -317,7 +317,7 @@ module CMachineGrammar
     ##
     # e :!
 
-    def compile(compile_data); expression.compile(compile_data) + I[:!]; end
+    def compile(compile_context); expression.compile(compile_context) + I[:!]; end
 
   end
 
@@ -326,7 +326,7 @@ module CMachineGrammar
     ##
     # e :-@
 
-    def compile(compile_data); expression.compile(compile_data) + I[:-@]; end
+    def compile(compile_context); expression.compile(compile_context) + I[:-@]; end
 
   end
 
@@ -336,7 +336,7 @@ module CMachineGrammar
     # The expression is already a type expression so we just need to look it up in the
     # context and replace it with the size.
 
-    def compile(compile_data)
+    def compile(compile_context)
       raise StandardError, "Not implemented."
     end
 
@@ -356,7 +356,7 @@ module CMachineGrammar
     # Allocate the requested amount of space and return a pointer to the start of the allocated
     # memory block.
 
-    def compile(compile_data)
+    def compile(compile_context)
       raise StandardError, "Not implemented."
     end
 
@@ -378,7 +378,7 @@ module CMachineGrammar
     ##
     # The types of left and right need to match and the left side needs to be an lvalue.
 
-    def compile(compile_data)
+    def compile(compile_context)
       raise StandardError, "Not implemented."
     end
 
@@ -406,11 +406,11 @@ module CMachineGrammar
     # during a post-processing step. The labels themselves stay in the code but the VM
     # interprets them as no-ops.
 
-    def compile(compile_data)
-      else_target, end_target = compile_data.get_label, compile_data.get_label
-      test.compile(compile_data) + I[:jumpz, else_target] +
-       true_branch.compile(compile_data.increment) + I[:jump, end_target] + I[:label, else_target] +
-       false_branch.compile(compile_data.increment) + I[:label, end_target]
+    def compile(compile_context)
+      else_target, end_target = compile_context.get_label, compile_context.get_label
+      test.compile(compile_context) + I[:jumpz, else_target] +
+       true_branch.compile(compile_context.increment) + I[:jump, end_target] + I[:label, else_target] +
+       false_branch.compile(compile_context.increment) + I[:label, end_target]
     end
 
   end
@@ -422,10 +422,10 @@ module CMachineGrammar
     # Pretty similar to how we compile "if" statements. We have some jump targets and a test
     # to figure out where to jump.
 
-    def compile(compile_data)
-      test_target, end_target = compile_data.get_label, compile_data.get_label
-      I[:label, test_target] + test.compile(compile_data) + I[:jumpz, end_target] +
-       body.compile(compile_data) + I[:jump, test_target]
+    def compile(compile_context)
+      test_target, end_target = compile_context.get_label, compile_context.get_label
+      I[:label, test_target] + test.compile(compile_context) + I[:jumpz, end_target] +
+       body.compile(compile_context) + I[:jump, test_target]
     end
 
   end
@@ -437,11 +437,11 @@ module CMachineGrammar
     # init [:test] test jumpz(:end) body update jump(:test) [:end]
     # A bit convoluted but manageable.
 
-    def compile(compile_data)
-      test_target, end_target = compile_data.get_label, compile_data.get_label
-      init.compile(compile_data) + I[:label, test_target] +
-       test.expression.compile(compile_data) + I[:jumpz, end_target] +
-       body.compile(compile_data) + update.compile(compile_data) + I[:pop, 1] +
+    def compile(compile_context)
+      test_target, end_target = compile_context.get_label, compile_context.get_label
+      init.compile(compile_context) + I[:label, test_target] +
+       test.expression.compile(compile_context) + I[:jumpz, end_target] +
+       body.compile(compile_context) + update.compile(compile_context) + I[:pop, 1] +
        I[:jump, test_target] + I[:label, end_target]
     end
 
@@ -453,7 +453,7 @@ module CMachineGrammar
     # Just compile the body. The rest is taken care of by the parent node
     # which should always be a +Switch+ node.
 
-    def compile(compile_data); body.compile(compile_data); end
+    def compile(compile_context); body.compile(compile_context); end
 
   end
 
@@ -467,19 +467,19 @@ module CMachineGrammar
     # with appropriate jump targets when the case matches and jumps to the other pieces of
     # the ladder when it doesn't.
 
-    def generate_binary_search_code(cases, labels, compile_data)
+    def generate_binary_search_code(cases, labels, compile_context)
       if cases.length < 3
         cases.map do |c|
           I[:dup] + I[:loadc, (c_val = c.case.value)] + I[:==] + I[:jumpnz, labels[c_val]]
         end.flatten
       else
         # mid top :less bottom
-        midpoint, less_label = cases.length / 2, compile_data.get_label
+        midpoint, less_label = cases.length / 2, compile_context.get_label
         middle, bottom, top = cases[midpoint], cases[0...midpoint], cases[(midpoint + 1)..-1]
         I[:dup] + I[:loadc, (m_val = middle.case.value)] + I[:==] + I[:jumpnz, labels[m_val]] +
          I[:dup] + I[:loadc, m_val] + I[:<] + I[:jumpnz, less_label] +
-         generate_binary_search_code(top, labels, compile_data) + I[:label, less_label] +
-         generate_binary_search_code(bottom, labels, compile_data)
+         generate_binary_search_code(top, labels, compile_context) + I[:label, less_label] +
+         generate_binary_search_code(bottom, labels, compile_context)
       end
     end
 
@@ -488,17 +488,17 @@ module CMachineGrammar
     # First we sort the case statements and assign jump targets to each statement. Then we
     # generate the binary search ladder for the cases and place it before the case blocks.
 
-    def compile(compile_data)
+    def compile(compile_context)
       # Sort and generate labels for the cases.
-      default_label = compile_data.get_label
+      default_label = compile_context.get_label
       sorted_cases = cases.sort {|a, b| a.case.value <=> b.case.value}
-      labels = sorted_cases.reduce({}) {|m, c| m[c.case.value] = compile_data.get_label; m}
+      labels = sorted_cases.reduce({}) {|m, c| m[c.case.value] = compile_context.get_label; m}
       # Generate the binary search ladder.
-      binary_search_sequence = generate_binary_search_code(sorted_cases, labels, compile_data)
+      binary_search_sequence = generate_binary_search_code(sorted_cases, labels, compile_context)
       # Compile the test expression, attach the binary search ladder and the code for each case.
-      (test.compile(compile_data) + binary_search_sequence + I[:jump, default_label] +
-       sorted_cases.map {|c| I[:label, labels[c.case.value]] + c.compile(compile_data)} +
-       I[:label, default_label] + default.compile(compile_data)).flatten
+      (test.compile(compile_context) + binary_search_sequence + I[:jump, default_label] +
+       sorted_cases.map {|c| I[:label, labels[c.case.value]] + c.compile(compile_context)} +
+       I[:label, default_label] + default.compile(compile_context)).flatten
     end
 
   end
@@ -517,8 +517,8 @@ module CMachineGrammar
     ##
     # s1 pop s2 pop s3 pop ... sn pop
 
-    def compile(compile_data)
-      statements.map {|s| s.compile(compile_data)}.flatten
+    def compile(compile_context)
+      statements.map {|s| s.compile(compile_context)}.flatten
     end
 
   end
@@ -531,8 +531,8 @@ module CMachineGrammar
     # a compound variable on top of the stack? (TODO: Currently the stack invariant
     # is not maintained so need to figure out the correct number of elements to pop)
 
-    def compile(compile_data)
-      expression.compile(compile_data) + I[:pop, 1]
+    def compile(compile_context)
+      expression.compile(compile_context) + I[:pop, 1]
     end
 
   end
@@ -622,7 +622,7 @@ module CMachineGrammar
     # To figure out the size of a derived type we first have to look it up in the compilation
     # context and return the size of whatever struct was declared by that name.
 
-    def size(compile_data); compile_data.get_struct_data(name).size(compile_data); end
+    def size(compile_context); compile_context.get_struct_data(name).size(compile_context); end
 
   end
 
@@ -631,7 +631,7 @@ module CMachineGrammar
     ##
     # Size of a struct member is the size of the underlying type.
 
-    def size(compile_data); @size ||= type.size(compile_data); end
+    def size(compile_context); @size ||= type.size(compile_context); end
 
   end
 
@@ -650,9 +650,9 @@ module CMachineGrammar
     # the members that are declared before that member and this information is computed when
     # we compute the total size of the struct.
     
-    def offset(compile_data, member)
+    def offset(compile_context, member)
       # Call size to instantiate +@offsets+ hash and then lookup the member in the hash.
-      size(compile_data)
+      size(compile_context)
       if (member_offset = @offsets[member]).nil?
         raise StandardError, "Unknown struct member #{member} for struct #{name}."
       end
@@ -664,22 +664,22 @@ module CMachineGrammar
     # we are computing the size of the entire struct we can also compute and save the offsets
     # for the struct members in +@offsets+.
 
-    def size(compile_data)
+    def size(compile_context)
       @offsets ||= {}
       @size ||= members.reduce(0) do |m, member|
         @offsets[member.name] = m
-        m + member.size(compile_data)
+        m + member.size(compile_context)
       end
     end
 
     ##
     # Compiling struct declarations means putting information in a symbol table for the given struct.
 
-    def compile(compile_data)
-      if !compile_data.get_struct_data(name).nil?
+    def compile(compile_context)
+      if !compile_context.get_struct_data(name).nil?
         raise StandardError, "A struct by the given name is already defined: #{name}."
       end
-      compile_data.assign_struct_data(name, self)
+      compile_context.assign_struct_data(name, self)
       []
     end
 
@@ -696,8 +696,8 @@ module CMachineGrammar
       # we need to look up other types. This means there is an infinite loop lurking here
       # if two types refer to each other.
 
-      def size(compile_data)
-        declaration.type.size(compile_data)
+      def size(compile_context)
+        declaration.type.size(compile_context)
       end
 
       def name
@@ -726,19 +726,19 @@ module CMachineGrammar
     ##
     # TODO: Fix the storing and popping because not all variables are of the same size.
 
-    def compile(compile_data)
-      latest_declaration = compile_data.latest_declaration
+    def compile(compile_context)
+      latest_declaration = compile_context.latest_declaration
       if latest_declaration.nil?
         variable_data = VariableData.new(self, 0)
       else
-        offset = latest_declaration.offset + latest_declaration.size(compile_data)
+        offset = latest_declaration.offset + latest_declaration.size(compile_context)
         variable_data = VariableData.new(self, offset)
       end
-      compile_data.add_variable(variable_data)
-      variable_initialization = I[:initvar, type.size(compile_data).to_i]
+      compile_context.add_variable(variable_data)
+      variable_initialization = I[:initvar, type.size(compile_context).to_i]
       variable_assignment = value ?
-       value.compile(compile_data) +
-       I[:storea, variable_data.offset, (s = value.size(compile_data))] +
+       value.compile(compile_context) +
+       I[:storea, variable_data.offset, (s = value.size(compile_context))] +
        I[:pop, s] : []
       variable_initialization + variable_assignment
     end
@@ -768,11 +768,11 @@ module CMachineGrammar
       body.type_check(typing_context)
     end
 
-    def compile(compile_data)
+    def compile(compile_context)
       # Note that the function definition must be saved in the new context because the return
       # type must be visible in that context so that we know what to do with return statements, i.e.
       # how many values we need to pop and return to the previous stack.
-      function_context = compile_data.increment
+      function_context = compile_context.increment
       function_context.save_function_definition(self)
       arguments.each {|arg_def| arg_def.compile(function_context)}
       I[:label, name] + body.compile(function_context)
@@ -787,8 +787,8 @@ module CMachineGrammar
 
   class ArgumentDefinition < Struct.new(:type, :name)
     
-    def compile(compile_data)
-      VariableDeclaration.new(type, name, nil).compile(compile_data)
+    def compile(compile_context)
+      VariableDeclaration.new(type, name, nil).compile(compile_context)
       []
     end
 
@@ -814,8 +814,8 @@ module CMachineGrammar
       @return_size = current_function.return_type.size(typing_context)
     end
 
-    def compile(compile_data)
-      return_expression.compile(compile_data) +
+    def compile(compile_context)
+      return_expression.compile(compile_context) +
        I[:storea, 0, @return_size] +
        I[:return, @return_size]
     end
@@ -849,9 +849,9 @@ module CMachineGrammar
       @type ||= typing_context[name].return_type
     end
 
-    def compile(compile_data)
+    def compile(compile_context)
       # Evaluate the arguments and then transport them to the new stack
-      arguments.flat_map {|arg| arg.compile(compile_data)} +
+      arguments.flat_map {|arg| arg.compile(compile_context)} +
        I[:pushstack, @arguments_size] + I[:call, name]
     end
 

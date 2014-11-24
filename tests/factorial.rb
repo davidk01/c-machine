@@ -6,7 +6,7 @@ class TestFunctionCalls < MiniTest::Unit::TestCase
 
   def setup
     @code = File.read(File.expand_path(File.dirname(__FILE__) + '/../examples/factorial'))
-    @context = CMachineGrammar::CompileData.new
+    @context = CMachineGrammar::CompileContext.new
     @ast = CMachineGrammar.parse(@code)
     @bytecode = @ast.map {|node| node.compile(@context)}.flatten
     @machine = CMachine.new(@bytecode)

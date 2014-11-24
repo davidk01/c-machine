@@ -4,7 +4,7 @@ module CMachineGrammar
   # Keeps track of some global counters and data as we compile C-variant code into
   # VM code.
 
-  class CompileData
+  class CompileContext
 
     def initialize(outer_context = nil, level = 0)
       @label_counter, @structs, @functions = -1, {}, {}
