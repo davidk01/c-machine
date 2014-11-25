@@ -1,7 +1,23 @@
 class TypingContext
 
-  def initialize(parent = {}, level = 0)
+  attr_writer :latest_declaration
+
+  class EmptyDeclaration
+    def self.offset
+      0
+    end
+    def self.size
+      0
+    end
+  end
+
+  def initialize(parent = {}, level = 0, latest_declaration = EmptyDeclaration)
     @context, @parent, @current_function, @level = {}, parent, nil, level
+    @latest_declaration = latest_declaration
+  end
+
+  def latest_declaration
+    @latest_declaration || @parent.latest_declaration
   end
 
   def []=(key, value)
@@ -9,7 +25,7 @@ class TypingContext
   end
 
   def increment
-    self.class.new(self, @level + 1)
+    self.class.new(self, @level + 1, @latest_declaration)
   end
 
   def [](key)

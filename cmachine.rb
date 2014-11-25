@@ -89,10 +89,10 @@ class CMachine
   
   def execute
     # Debugging output.
-    #puts "Return: #{@return.map(&:to_s).join(', ')}."
-    #puts "Instruction: #@pc, #@ir."
-    #puts "Stack: #{@stack.to_s}."
-    #puts "-----------------"
+    puts "Return: #{@return.map(&:to_s).join(', ')}."
+    puts "Instruction: #@pc, #@ir."
+    puts "Stack: #{@stack.to_s}."
+    puts "-----------------"
     #########
     case (sym = (@ir || Instruction.new(:noop, [])).instruction)
     when :label

@@ -90,7 +90,7 @@ module CMachineGrammar
 
   @operator_map = {
    :'=' => EqExp, :< => LessExp, :+ => AddExp, :* => MultExp, :- => DiffExp, :/ => DivExp,
-   :<= => LessEqExp
+   :<= => LessEqExp, :> => GreaterExp
   }
 
   ##
@@ -121,8 +121,8 @@ module CMachineGrammar
       StructDeclaration.new(struct_name, struct_members)
     when :def # function definition
       function_name = SymbolWrapper.new(s_expr[1])
-      function_arguments = s_expr[2].each_slice(2).each_with_index.map do |(argument_name, argument_type), index|
-        ArgumentDefinition.new(type_resolution(argument_type), SymbolWrapper.new(argument_name), index)
+      function_arguments = s_expr[2].each_slice(2).map do |argument_name, argument_type|
+        ArgumentDefinition.new(type_resolution(argument_type), SymbolWrapper.new(argument_name))
       end
       return_type = type_resolution(s_expr[3])
       function_body = Statements.new(s_expr[4..-1].map {|e| to_ast(e)})

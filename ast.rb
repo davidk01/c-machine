@@ -7,6 +7,8 @@ module CMachineGrammar
 
   class SymbolWrapper < Struct.new(:symbol)
 
+    attr_reader :size, :offset
+
     def infer_type(typing_context)
       typing_context[self].type
     end
@@ -254,6 +256,18 @@ module CMachineGrammar
 
   class GreaterExp < OpReducers
 
+    def infer_type(typing_context)
+      BoolType
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      types = expressions.map {|e| e.infer_type(typing_context)}
+      if !types.all?(&:numeric?)
+        raise StandardError, "Can not compare non-numeric types."
+      end
+    end
+
     ##
     # Same as above.
 
@@ -328,6 +342,8 @@ module CMachineGrammar
     # distinction that is still unclear to me.
 
     def type_check(typing_context)
+      left.type_check(typing_context)
+      right.type_check(typing_context)
       if left.infer_type(typing_context) != right.infer_type(typing_context)
         raise StandardError, "Non-conformant assignment."
       end
@@ -337,25 +353,21 @@ module CMachineGrammar
     # The types of left and right need to match and the left side needs to be an lvalue.
 
     def compile(compile_context)
-      raise StandardError, "Not implemented."
+      right.compile(compile_context) + I[:storea, left.offset, left.size]
     end
 
   end
 
   class If < Struct.new(:test, :true_branch, :false_branch)
 
-    ##
-    # The test must be boolean and then each branch must be well-typed. I don't see any reason
-    # why both branches must be of the same type so I'm not going to force that condition. Will
-    # revisit later.
-
     def type_check(typing_context)
       test.type_check(typing_context)
       if test.infer_type(typing_context) != BoolType
         raise StandardError, "Test for if statement must be of boolean type."
       end
-      true_branch.type_check(typing_context)
-      false_branch.type_check(typing_context)
+      # true and false branches are treated as separate blocks
+      true_branch.type_check(typing_context.increment)
+      false_branch.type_check(typing_context.increment)
     end
 
     ##
@@ -384,7 +396,15 @@ module CMachineGrammar
     def compile(compile_context)
       test_target, end_target = compile_context.get_label, compile_context.get_label
       I[:label, test_target] + test.compile(compile_context) + I[:jumpz, end_target] +
-       body.compile(compile_context) + I[:jump, test_target]
+       body.compile(compile_context) + I[:jump, test_target] + I[:label, end_target]
+    end
+
+    def type_check(typing_context)
+      test.type_check(typing_context)
+      body.type_check(typing_context)
+      if !test.infer_type(typing_context) == BoolType
+        raise StandardError, "Mis-typed condition expression for while loop."
+      end
     end
 
   end
@@ -648,6 +668,8 @@ module CMachineGrammar
 
   class VariableDeclaration < Struct.new(:type, :variable, :value)
 
+    attr_reader :size, :offset
+
     def type_check(typing_context)
       if typing_context[variable]
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
@@ -658,7 +680,9 @@ module CMachineGrammar
           raise StandardError, "Type of variable does not match type of initializer: #{variable}."
         end
       end
-      @size, @offset = type.size(typing_context)
+      latest_declaration = typing_context.latest_declaration
+      @size, @offset = type.size(typing_context), latest_declaration.offset + latest_declaration.size
+      typing_context.latest_declaration = self
     end
 
     ##
@@ -668,7 +692,7 @@ module CMachineGrammar
       variable_initialization = I[:initvar, @size]
       variable_assignment = value ?
        value.compile(compile_context) +
-       I[:storea, @offset, (s = value.size(compile_context))] + I[:pop, s] : []
+       I[:storea, @offset, @size] + I[:pop, @size] : []
       variable_initialization + variable_assignment
     end
 
@@ -705,23 +729,18 @@ module CMachineGrammar
 
     def compile(compile_context)
       function_context = compile_context.increment
-      I[:label, name] + body.compile(function_context)
+      I[:label, name.symbol] + body.compile(function_context)
     end
 
   end
 
-  ##
-  # We treat argument definitions as phantom variable declarations during compilation.
-  # What I mean by phantom is that we update the compilation context but we do not output
-  # any actual bytecode.
-
-  class ArgumentDefinition < Struct.new(:type, :name, :index, :offset, :size)
+  class ArgumentDefinition < Struct.new(:type, :name, :offset, :size)
 
     ##
     # TODO: Figure out what it means to typecheck an argument definition.
 
     def type_check(typing_context)
-      true
+      typing_context.latest_declaration = self
     end
 
   end
@@ -785,7 +804,7 @@ module CMachineGrammar
     def compile(compile_context)
       # Evaluate the arguments and then transport them to the new stack
       arguments.flat_map {|arg| arg.compile(compile_context)} +
-       I[:pushstack, @arguments_size] + I[:call, name]
+       I[:pushstack, @arguments_size] + I[:call, name.symbol]
     end
 
   end

@@ -6,9 +6,9 @@ module CMachineGrammar
 
   class CompileContext
 
-    def initialize(outer_context = nil, level = 0)
+    def initialize(outer_context = nil)
       @label_counter = -1
-      @outer_context, @level = outer_context, level
+      @outer_context = outer_context
     end
 
     ##
@@ -19,7 +19,7 @@ module CMachineGrammar
       if @outer_context
         return @outer_context.get_label
       end
-      "label#{@label_counter += 1}".to_sym
+      label = "label#{@label_counter += 1}".to_sym
     end
 
     ##
@@ -28,7 +28,7 @@ module CMachineGrammar
     # addresses.
 
     def increment
-      self.class.new(self, @level + 1)
+      self.class.new(self)
     end
 
   end
