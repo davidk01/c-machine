@@ -7,8 +7,8 @@ module CMachineGrammar
   class CompileContext
 
     def initialize(outer_context = nil, level = 0)
-      @label_counter, @structs, @functions = -1, {}, {}
-      @outer_context, @variables, @level = outer_context, [], level
+      @label_counter = -1
+      @outer_context, @level = outer_context, level
     end
 
     ##
@@ -29,10 +29,6 @@ module CMachineGrammar
 
     def increment
       self.class.new(self, @level + 1)
-    end
-
-    def offset(symbol)
-      require 'pry'; binding.pry
     end
 
   end

@@ -20,7 +20,6 @@ module CMachineGrammar
     end
 
     def compile(compile_context)
-      require 'pry'; binding.pry
       I[:loada, @offset, @size]
     end
 
@@ -95,9 +94,30 @@ module CMachineGrammar
 
   end
 
+  module NumericTypeHelpers
+
+    def infer_type(typing_context)
+      return @type if @type
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Mis-typed subtraction expression."
+      end
+      @type = expression_types.reduce(&:upper_bound)
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Can not multiply non-numeric arguments."
+      end
+    end
+
+  end
+
   class DiffExp < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # For each expression in the list of expressions we compile it and then we append n - 1 :- operations,
@@ -109,7 +129,7 @@ module CMachineGrammar
 
   class AddExp < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Same reasoning as for +DiffExp+ except we use :+.
@@ -120,7 +140,7 @@ module CMachineGrammar
 
   class ModExp < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Might need to re-think this since repeated modulo operation doesn't make much sense.
@@ -131,7 +151,7 @@ module CMachineGrammar
 
   class LeftShift < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Same as above.
@@ -142,7 +162,7 @@ module CMachineGrammar
 
   class RightShift < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Same as above.
@@ -153,7 +173,7 @@ module CMachineGrammar
 
   class MultExp < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Same as above.
@@ -164,7 +184,7 @@ module CMachineGrammar
 
   class DivExp < OpReducers
 
-    include NumericType
+    include NumericTypeHelpers
 
     ##
     # Same as above.
@@ -488,23 +508,6 @@ module CMachineGrammar
 
   module NumericType
 
-    def infer_type(typing_context)
-      return @type if @type
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Mis-typed subtraction expression."
-      end
-      @type = expression_types.reduce(&:upper_bound)
-    end
-
-    def type_check(typing_context)
-      expressions.each {|e| e.type_check(typing_context)}
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Can not multiply non-numeric arguments."
-      end
-    end
-
     def numeric?
       true
     end
@@ -655,7 +658,6 @@ module CMachineGrammar
           raise StandardError, "Type of variable does not match type of initializer: #{variable}."
         end
       end
-      require 'pry'; binding.pry
       @size, @offset = type.size(typing_context)
     end
 
@@ -698,7 +700,6 @@ module CMachineGrammar
         offset += arg.size
       end
       @arguments_size = arguments.map {|arg| arg.type.size(typing_context)}.reduce(&:+)
-      require 'pry'; binding.pry
       body.type_check(typing_context)
     end
 
@@ -765,6 +766,7 @@ module CMachineGrammar
       function = typing_context[name]
       function_argument_types = function.arguments.map(&:type)
       @arguments_size ||= function_argument_types.reduce(0) {|m, t| m + t.size(typing_context)}
+      arguments.each {|arg| arg.type_check(typing_context)}
       call_argument_types = arguments.map {|arg| arg.infer_type(typing_context)}
       if !function_argument_types.zip(call_argument_types).all? {|a, b| a == b}
         raise StandardError, "Call site arguments do not match definition: #{name}."
