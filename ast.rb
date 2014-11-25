@@ -689,23 +689,6 @@ module CMachineGrammar
 
   class VariableDeclaration < Struct.new(:type, :variable, :value)
 
-    class VariableData < Struct.new(:declaration, :offset)
-
-      ##
-      # We need to pass in +compile_data+ because in order to determine the size of a type
-      # we need to look up other types. This means there is an infinite loop lurking here
-      # if two types refer to each other.
-
-      def size(compile_context)
-        declaration.type.size(compile_context)
-      end
-
-      def name
-        declaration.variable
-      end
-
-    end
-
     ##
     # First we need to make sure a variable or function with the same name has not already
     # been declared. Then if there is a value we need to make sure that the type of the initializer
@@ -724,22 +707,13 @@ module CMachineGrammar
     end
 
     ##
-    # TODO: Fix the storing and popping because not all variables are of the same size.
+    # TODO: Get this to work.
 
     def compile(compile_context)
-      latest_declaration = compile_context.latest_declaration
-      if latest_declaration.nil?
-        variable_data = VariableData.new(self, 0)
-      else
-        offset = latest_declaration.offset + latest_declaration.size(compile_context)
-        variable_data = VariableData.new(self, offset)
-      end
-      compile_context.add_variable(variable_data)
-      variable_initialization = I[:initvar, type.size(compile_context).to_i]
+      variable_initialization = I[:initvar, @size]
       variable_assignment = value ?
        value.compile(compile_context) +
-       I[:storea, variable_data.offset, (s = value.size(compile_context))] +
-       I[:pop, s] : []
+       I[:storea, @offset, (s = value.size(compile_context))] + I[:pop, s] : []
       variable_initialization + variable_assignment
     end
 
@@ -748,7 +722,6 @@ module CMachineGrammar
   ##
   # Generate a label that marks the beginning of the function so that function calls can
   # jump to the code.
-
   # Notes: The arguments are already meant to be on the stack set up by whoever has called us
   # this means I need to augment the context and treat each argument as a variable declaration.
 
@@ -763,18 +736,13 @@ module CMachineGrammar
     def type_check(typing_context)
       typing_context[name] = self
       typing_context.current_function = self
-      arguments.each {|arg| typing_context[arg.name] = arg}
+      arguments.each {|arg| arg.type_check(typing_context) && typing_context[arg.name] = arg}
       @arguments_size = arguments.map {|arg| arg.type.size(typing_context)}.reduce(&:+)
       body.type_check(typing_context)
     end
 
     def compile(compile_context)
-      # Note that the function definition must be saved in the new context because the return
-      # type must be visible in that context so that we know what to do with return statements, i.e.
-      # how many values we need to pop and return to the previous stack.
       function_context = compile_context.increment
-      function_context.save_function_definition(self)
-      arguments.each {|arg_def| arg_def.compile(function_context)}
       I[:label, name] + body.compile(function_context)
     end
 
@@ -786,11 +754,6 @@ module CMachineGrammar
   # any actual bytecode.
 
   class ArgumentDefinition < Struct.new(:type, :name)
-    
-    def compile(compile_context)
-      VariableDeclaration.new(type, name, nil).compile(compile_context)
-      []
-    end
 
   end
 
