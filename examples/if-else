@@ -1,4 +1,0 @@
-(def main () int
-  (declare y bool #t)
-  (if y (declare x int 2) (declare z int 3))
-  (return x))

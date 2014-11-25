@@ -1,4 +1,0 @@
-(def main () int
-  (declare x int 10)
-  (while (> x 0) (set x (- x 1)))
-  (return x))
