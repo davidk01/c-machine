@@ -2,10 +2,6 @@ require 'pegrb'
 require_relative './ast'
 require_relative './typingcontext'
 
-# The grammar that describes the subset of C we are going to work with.
-# I have taken some liberties with how arithmetic operations are defined
-# because I don't want to worry about precedence. So all arithmetic operations
-# are written prefix/function style, e.g. {+, -, *}(x, y, z, -(1, 2, 3)).
 module CMachineGrammar
 
   @grammar = Grammar.rules do
@@ -113,51 +109,51 @@ module CMachineGrammar
     # If we got to this point then we must be dealing with an array
 
     case (h = s_expr.first)
-    when :struct # struct definition
+    when :struct # (struct name member type ... member type)
       struct_name = SymbolWrapper.new(s_expr[1])
       struct_members = s_expr[2..-1].each_slice(2).map do |member_name, member_type|
         StructMember.new(type_resolution(member_type), SymbolWrapper.new(member_name))
       end
       StructDeclaration.new(struct_name, struct_members)
-    when :def # function definition
+    when :def # (def name (arg1 type ... argn type) return-type body)
       function_name = SymbolWrapper.new(s_expr[1])
       function_arguments = s_expr[2].each_slice(2).map do |argument_name, argument_type|
         ArgumentDefinition.new(type_resolution(argument_type), SymbolWrapper.new(argument_name))
       end
       return_type = type_resolution(s_expr[3])
       function_body = Statements.new(s_expr[4..-1].map {|e| to_ast(e)})
-      # make sure the argument names are unique
+      # make sure the argument names are unique, could also be handled during type-checking
       if function_arguments.length != function_arguments.map(&:name).uniq.length
         raise StandardError, "Argument names must be unique: function = #{function_name}."
       end
       FunctionDefinition.new(return_type, function_name, function_arguments, function_body)
-    when :do # sequence of statements
+    when :do # (do stmt ... stmt)
       Statements.new(s_expr[1..-1].map {|e| to_ast(e)})
-    when :declare # variable declaration
+    when :declare # (declare name type value?)
       variable_name = SymbolWrapper.new(s_expr[1])
       variable_type = type_resolution(s_expr[2])
       variable_value = (value = s_expr[3]).nil? ? nil : to_ast(value)
       VariableDeclaration.new(variable_type, variable_name, variable_value)
-    when :set # variable mutation
+    when :set # (set variable value)
       variable_name = SymbolWrapper.new(s_expr[1])
       variable_value = to_ast(s_expr[2])
       Assignment.new(variable_name, variable_value)
-    when :if # if expression. else branch is optional so we need to fill it in with empty statement
+    when :if # (if test true-branch false-branch?)
       test = to_ast(s_expr[1])
       true_branch = to_ast(s_expr[2])
       false_branch = (false_code = s_expr[3]).nil? ? Statements.new([]) : to_ast(false_code)
       If.new(test, true_branch, false_branch)
-    when :while # while loop
+    when :while # (while test body)
       test_expression = to_ast(s_expr[1])
       loop_body = to_ast(s_expr[2])
       While.new(test_expression, loop_body)
-    when :for # for loop
+    when :for # (for init test update body)
       init = to_ast(s_expr[1])
       test = to_ast(s_expr[2])
       update = to_ast(s_expr[3])
       body = to_ast(s_expr[4])
       For.new(init, test, update, body)
-    when :case # case statement
+    when :case # (case value case1 code ... casen code)
       unless (cases = s_expr[2..-2]).length % 2 == 0
         raise StandardError, "Case statement must have a default case."
       end
@@ -172,30 +168,27 @@ module CMachineGrammar
         CaseFragment.new(element, to_ast(expression))
       end
       Switch.new(case_element, case_pairs, default)
-    when :sizeof # sizeof operator mostly useful for malloc
+    when :sizeof # (sizeof type-expression)
       type = type_resolution(s_expr[1])
       SizeOf.new(type)
-    when :malloc
+    when :malloc # (malloc int-expression)
       size = to_ast(s_expr[1])
       Malloc.new(size)
-    when :return # return statement
+    when :return # (return expression)
       return_expression = to_ast(s_expr[1])
       ReturnStatement.new(return_expression)
-    when :+, :-, :*, :/, :>>, :<<, :^, :%, :&, :| # arithmetic and bitwise operators
+    when :+, :-, :*, :/, :>>, :<<, :^, :%, :&, :|
       elements = s_expr[1..-1].map {|e| to_ast(e)}
       @operator_map[h].new(elements)
-    when :'=', :!=, :<, :>, :<=, :>=, :'&&', :'||' # tests and boolean operators
+    when :'=', :!=, :<, :>, :<=, :>=, :'&&', :'||'
       comparison_elements = s_expr[1..-1].map {|e| to_ast(e)}
       @operator_map[h].new(comparison_elements)
-    else
+    else # (function arg arg ... arg)
       # If none of the above is true then it must be a function call
       function_arguments = s_expr[1..-1].map {|e| to_ast(e)}
       FunctionCall.new(SymbolWrapper.new(h), function_arguments)
     end
   end
-
-  ##
-  # Go through the AST and make sure everything type checks.
 
   def self.annotate_types(ast)
     typing_context = TypingContext.new
