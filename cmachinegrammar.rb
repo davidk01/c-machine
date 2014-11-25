@@ -58,16 +58,6 @@ module CMachineGrammar
   end
 
   ##
-  # In certain places we need to make sure that things are symbols instead of other general
-  # structures so this is a convenient way to do it. Makes me wish I had some static types here.
-
-  class ::Symbol
-    def symbol!
-      self
-    end
-  end
-
-  ##
   # We need to recursively figure out what the type of the variable is because compound type
   # constructors like ptr and array can be nested arbitrarily.
 
@@ -82,7 +72,7 @@ module CMachineGrammar
     when :float
       FloatType
     when Array
-      compound_type_wrapper = type_specification[0].symbol!
+      compound_type_wrapper = type_specification[0]
       wrapped_type = type_specification[1]
       wrapped_type_length = type_specification[2]
       case compound_type_wrapper
@@ -94,7 +84,7 @@ module CMachineGrammar
         raise StandardError, "Unknown compound type specification."
       end
     else # non-basic type and not an array so must be a derived/declared type
-      DerivedType.new(type_specification.symbol!)
+      DerivedType.new(type_specification)
     end
   end
 
@@ -110,7 +100,7 @@ module CMachineGrammar
   def self.to_ast(s_expr)
     case s_expr
     when Symbol
-      return s_expr
+      return SymbolWrapper.new(s_expr)
     when ConstExp
       return s_expr
     when StringConst
@@ -122,17 +112,17 @@ module CMachineGrammar
 
     # If we got to this point then we must be dealing with an array
 
-    case (h = s_expr.first.symbol!)
+    case (h = s_expr.first)
     when :struct # struct definition
-      struct_name = s_expr[1].symbol!
+      struct_name = SymbolWrapper.new(s_expr[1])
       struct_members = s_expr[2..-1].each_slice(2).map do |member_name, member_type|
-        StructMember.new(type_resolution(member_type), member_name.symbol!)
+        StructMember.new(type_resolution(member_type), SymbolWrapper.new(member_name))
       end
       StructDeclaration.new(struct_name, struct_members)
     when :def # function definition
-      function_name = s_expr[1].symbol!
-      function_arguments = s_expr[2].each_slice(2).map do |argument_name, argument_type|
-        ArgumentDefinition.new(type_resolution(argument_type), argument_name.symbol!)
+      function_name = SymbolWrapper.new(s_expr[1])
+      function_arguments = s_expr[2].each_slice(2).each_with_index.map do |(argument_name, argument_type), index|
+        ArgumentDefinition.new(type_resolution(argument_type), SymbolWrapper.new(argument_name), index)
       end
       return_type = type_resolution(s_expr[3])
       function_body = Statements.new(s_expr[4..-1].map {|e| to_ast(e)})
@@ -144,12 +134,12 @@ module CMachineGrammar
     when :do # sequence of statements
       Statements.new(s_expr[1..-1].map {|e| to_ast(e)})
     when :declare # variable declaration
-      variable_name = s_expr[1].symbol!
+      variable_name = SymbolWrapper.new(s_expr[1])
       variable_type = type_resolution(s_expr[2])
       variable_value = (value = s_expr[3]).nil? ? nil : to_ast(value)
       VariableDeclaration.new(variable_type, variable_name, variable_value)
     when :set # variable mutation
-      variable_name = s_expr[1].symbol!
+      variable_name = SymbolWrapper.new(s_expr[1])
       variable_value = to_ast(s_expr[2])
       Assignment.new(variable_name, variable_value)
     when :if # if expression. else branch is optional so we need to fill it in with empty statement
@@ -200,7 +190,7 @@ module CMachineGrammar
     else
       # If none of the above is true then it must be a function call
       function_arguments = s_expr[1..-1].map {|e| to_ast(e)}
-      FunctionCall.new(h, function_arguments)
+      FunctionCall.new(SymbolWrapper.new(h), function_arguments)
     end
   end
 

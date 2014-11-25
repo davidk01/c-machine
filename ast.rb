@@ -5,29 +5,23 @@ I = CMachine::Instruction
 
 module CMachineGrammar
 
-  ##
-  # We use symbols for variables so instead of special casing symbols I'm just going to open
-  # up the class and make sure symbols play nice with type checking and type inference.
-
-  class ::Symbol
-
-    def type_check(_)
-      true
-    end
-
-    ##
-    # Not much to do here other than look up the type of the variable in the typing context.
+  class SymbolWrapper < Struct.new(:symbol)
 
     def infer_type(typing_context)
       typing_context[self].type
     end
 
     ##
-    # Get the variable data and push the contents on the stack.
+    # Get the offset and size from the typing context.
+
+    def type_check(typing_context)
+      declaration = typing_context[self]
+      @offset, @size = declaration.offset, declaration.size
+    end
 
     def compile(compile_context)
-      variable_data = compile_context.get_variable_data(self)
-      I[:loada, variable_data.offset, variable_data.declaration.type.size(compile_context)]
+      require 'pry'; binding.pry
+      I[:loada, @offset, @size]
     end
 
   end
@@ -59,21 +53,6 @@ module CMachineGrammar
 
   # AST classes
 
-  class Identifier < Struct.new(:value)
-
-    ##
-    # An identifier means we are accessing a variable. So we load the value of the variable
-    # on the stack through its address.
-
-    def compile(compile_context)
-      variable_data = compile_context.get_variable_data(value)
-      raise StandardError, "Undefined variable access: #{val}." unless variable_data
-      starting_address = variable_data.offset
-      I[:loada, variable_data.offset, variable_data.size(compile_context)]
-    end
-
-  end
-
   class StringConst < Struct.new(:value)
 
     ##
@@ -86,7 +65,7 @@ module CMachineGrammar
   class ConstExp < Struct.new(:value)
 
     ##
-    # What does it mean to typecheck a constant?
+    # TODO: Don't know.
 
     def type_check(typing_context)
       true
@@ -118,17 +97,7 @@ module CMachineGrammar
 
   class DiffExp < OpReducers
 
-    ##
-    # Same as for +AddExp+
-
-    def infer_type(typing_context)
-      return @type if @type
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Mis-typed subtraction expression."
-      end
-      @type = expression_types.reduce(&:upper_bound)
-    end
+    include NumericType
 
     ##
     # For each expression in the list of expressions we compile it and then we append n - 1 :- operations,
@@ -140,18 +109,7 @@ module CMachineGrammar
 
   class AddExp < OpReducers
 
-    ##
-    # To infer the type of an addition expression we infer the types of each addend and make sure
-    # that each addend has an integer or float type. If there is a float type in the mix then
-    # the type of the entire expression is float.
-
-    def infer_type(typing_context)
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Mis-typed add expression."
-      end
-      @type ||= expression_types.reduce(&:upper_bound)
-    end
+    include NumericType
 
     ##
     # Same reasoning as for +DiffExp+ except we use :+.
@@ -162,6 +120,8 @@ module CMachineGrammar
 
   class ModExp < OpReducers
 
+    include NumericType
+
     ##
     # Might need to re-think this since repeated modulo operation doesn't make much sense.
     
@@ -170,6 +130,8 @@ module CMachineGrammar
   end
 
   class LeftShift < OpReducers
+
+    include NumericType
 
     ##
     # Same as above.
@@ -180,6 +142,8 @@ module CMachineGrammar
 
   class RightShift < OpReducers
 
+    include NumericType
+
     ##
     # Same as above.
 
@@ -189,24 +153,7 @@ module CMachineGrammar
 
   class MultExp < OpReducers
 
-    def type_check(typing_context)
-      expressions.each {|e| e.type_check(typing_context)}
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Can not multiply non-numeric arguments."
-      end
-    end
-
-    ##
-    # Same as for +AddExp+.
-
-    def infer_type(typing_context)
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Mis-typed multiplication expression."
-      end
-      @type ||= expression_types.reduce(&:upper_bound)
-    end
+    include NumericType
 
     ##
     # Same as above.
@@ -217,16 +164,7 @@ module CMachineGrammar
 
   class DivExp < OpReducers
 
-    ##
-    # Same as for +AddExp+.
-
-    def infer_type(typing_context)
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if !expression_types.all?(&:numeric?)
-        raise StandardError, "Mis-typed division expression."
-      end
-      @type ||= expression_types.reduce(&:upper_bound)
-    end
+    include NumericType
 
     ##
     # Same as above.
@@ -409,8 +347,9 @@ module CMachineGrammar
     def compile(compile_context)
       else_target, end_target = compile_context.get_label, compile_context.get_label
       test.compile(compile_context) + I[:jumpz, else_target] +
-       true_branch.compile(compile_context.increment) + I[:jump, end_target] + I[:label, else_target] +
-       false_branch.compile(compile_context.increment) + I[:label, end_target]
+       true_branch.compile(compile_context.increment) + I[:jump, end_target] +
+       I[:label, else_target] + false_branch.compile(compile_context.increment) +
+       I[:label, end_target]
     end
 
   end
@@ -548,6 +487,23 @@ module CMachineGrammar
   # Common operations for numeric types.
 
   module NumericType
+
+    def infer_type(typing_context)
+      return @type if @type
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Mis-typed subtraction expression."
+      end
+      @type = expression_types.reduce(&:upper_bound)
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Can not multiply non-numeric arguments."
+      end
+    end
 
     def numeric?
       true
@@ -689,11 +645,6 @@ module CMachineGrammar
 
   class VariableDeclaration < Struct.new(:type, :variable, :value)
 
-    ##
-    # First we need to make sure a variable or function with the same name has not already
-    # been declared. Then if there is a value we need to make sure that the type of the initializer
-    # matches the type of the variable.
-
     def type_check(typing_context)
       if typing_context[variable]
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
@@ -704,6 +655,8 @@ module CMachineGrammar
           raise StandardError, "Type of variable does not match type of initializer: #{variable}."
         end
       end
+      require 'pry'; binding.pry
+      @size, @offset = type.size(typing_context)
     end
 
     ##
@@ -736,8 +689,16 @@ module CMachineGrammar
     def type_check(typing_context)
       typing_context[name] = self
       typing_context.current_function = self
-      arguments.each {|arg| arg.type_check(typing_context) && typing_context[arg.name] = arg}
+      offset = 0
+      arguments.each do |arg|
+        arg.type_check(typing_context)
+        typing_context[arg.name] = arg
+        arg.offset = offset
+        arg.size = arg.type.size(typing_context)
+        offset += arg.size
+      end
       @arguments_size = arguments.map {|arg| arg.type.size(typing_context)}.reduce(&:+)
+      require 'pry'; binding.pry
       body.type_check(typing_context)
     end
 
@@ -753,7 +714,14 @@ module CMachineGrammar
   # What I mean by phantom is that we update the compilation context but we do not output
   # any actual bytecode.
 
-  class ArgumentDefinition < Struct.new(:type, :name)
+  class ArgumentDefinition < Struct.new(:type, :name, :index, :offset, :size)
+
+    ##
+    # TODO: Figure out what it means to typecheck an argument definition.
+
+    def type_check(typing_context)
+      true
+    end
 
   end
 
