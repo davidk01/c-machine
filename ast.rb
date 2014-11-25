@@ -316,20 +316,19 @@ module CMachineGrammar
 
   class Malloc < Struct.new(:size)
 
-    ##
-    # Malloc is special when it comes to types. It is a wildcard pointer and so can be assigned
-    # to any pointer type variable.
+    def type_check(typing_context)
+      size.type_check(typing_context)
+      if size.infer_type(typing_context) != IntType
+        raise StandardError, "Can not allocate non-integer amount of space."
+      end
+    end
 
     def infer_type(_)
       WildcardPointer
     end
 
-    ##
-    # Allocate the requested amount of space and return a pointer to the start of the allocated
-    # memory block.
-
     def compile(compile_context)
-      raise StandardError, "Not implemented."
+      size.compile(compile_context) + I[:malloc]
     end
 
   end

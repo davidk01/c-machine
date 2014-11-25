@@ -1,4 +1,5 @@
 require_relative './cmachinestack'
+require_relative './cmachineheap'
 
 ##
 # The actual virtual machine class.
@@ -23,6 +24,8 @@ class CMachine
   # :loada s c (load c elements starting at s)
   # :storea s c (store c elements starting at s)
   # :initvar s l (initialize l zeroes starting at s)
+  # :malloc (allocate space on the heap and return a pointer to it. amount of allocation is 
+  #          top of stack)
   # :jump a (jump to address a)
   # :jumpz a (jump to address a if top of stack is 0)
   # :jumpnz a (jump to address a if top of stack is not 0)
@@ -50,8 +53,8 @@ class CMachine
   # Set up the initial stack and registers.
   
   def initialize(c)
-    @code, @stack, @pc, @ir, @return = c + Instruction[:call, :main],
-     Stack.new, c.length - 1, nil, []
+    @code, @stack, @pc, @ir, @return, @heap = c + Instruction[:call, :main],
+     Stack.new, c.length - 1, nil, [], Heap.new
     resolve_references
   end
 
@@ -114,6 +117,9 @@ class CMachine
     when :initvar
       len = @ir.arguments[0]
       @stack.push(*[0] * len)
+    when :malloc
+      starting_address = @heap.allocate(@stack.pop)
+      @stack.push(starting_address)
     when :pop
       result = nil
       @ir.arguments[0].times { result = @stack.pop }
