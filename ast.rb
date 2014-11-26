@@ -304,12 +304,16 @@ module CMachineGrammar
 
   class SizeOf < Struct.new(:type)
 
-    ##
-    # The expression is already a type expression so we just need to look it up in the
-    # context and replace it with the size.
+    def type_check(typing_context)
+      @size = type.size(typing_context)
+    end
+
+    def infer_type(typing_context)
+      IntType
+    end
 
     def compile(compile_context)
-      raise StandardError, "Not implemented."
+      I[:loadc, @size]
     end
 
   end
@@ -670,6 +674,7 @@ module CMachineGrammar
     attr_reader :size, :offset
 
     def type_check(typing_context)
+      value.type_check(typing_context)
       if typing_context[variable]
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
       end
@@ -682,6 +687,7 @@ module CMachineGrammar
       latest_declaration = typing_context.latest_declaration
       @size, @offset = type.size(typing_context), latest_declaration.offset + latest_declaration.size
       typing_context.latest_declaration = self
+      variable.type_check(typing_context)
     end
 
     ##

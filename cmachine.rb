@@ -47,14 +47,14 @@ class CMachine
   ##
   # Readers for most of the internal state. Will help with debugging.
 
-  attr_reader :code, :stack, :pc, :ir, :return
+  attr_reader :code, :stack, :pc, :ir, :return, :heap
 
   ##
   # Set up the initial stack and registers.
   
   def initialize(c)
-    @code, @stack, @pc, @ir, @return, @heap = c + Instruction[:call, :main],
-     Stack.new, c.length - 1, nil, [], Heap.new
+    @code, @stack, @pc, @ir, @return, @heap = c + Instruction[:halt] + Instruction[:call, :main],
+     Stack.new, c.length, nil, [], Heap.new
     resolve_references
   end
 
@@ -93,11 +93,14 @@ class CMachine
   def execute
     # Debugging output.
     puts "Return: #{@return.map(&:to_s).join(', ')}."
-    puts "Instruction: #@pc, #@ir."
     puts "Stack: #{@stack.to_s}."
+    puts "Heap: #{@heap}."
+    puts "Instruction: #@pc, #@ir."
     puts "-----------------"
     #########
     case (sym = (@ir || Instruction.new(:noop, [])).instruction)
+    when :halt
+      raise StandardError, "Halting."
     when :label
     when :noop
     when :pushstack

@@ -1,0 +1,3 @@
+(def main () (ptr int)
+  (declare x (ptr int) (malloc (sizeof int)))
+  (return x))
