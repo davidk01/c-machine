@@ -1,0 +1,9 @@
+(def array-test () int
+  (declare x (array int 10))
+  (set (nth x 0) 1)
+  (set (nth x 1) 1)
+  (set (nth x 2) 2)
+  (return (nth x 2)))
+
+(def main () int
+  (return (array-test)))

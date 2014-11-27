@@ -25,6 +25,10 @@ module CMachineGrammar
       I[:loada, @offset, @size]
     end
 
+    def assignment_compile(compile_context)
+      I[:loadc, @offset]
+    end
+
   end
 
   ##
@@ -337,6 +341,36 @@ module CMachineGrammar
 
   end
 
+  class ArrayIndexExpression < Struct.new(:reference, :index)
+
+    def type_check(typing_context)
+      reference.type_check(typing_context)
+      index.type_check(typing_context)
+      if index.infer_type(typing_context) != IntType
+        raise StandardError, "Array index must be integer."
+      end
+      if !(ArrayType === (array_type = reference.infer_type(typing_context)))
+        raise StandardError, "Can not index non-array reference type."
+      end
+      @index_scale = array_type.type.size(typing_context)
+    end
+
+    def infer_type(typing_context)
+      reference.infer_type(typing_context).type
+    end
+
+    def assignment_compile(compile_context)
+      reference.assignment_compile(compile_context) + I[:loadc, @index_scale] +
+       index.compile(compile_context) + I[:*] + I[:+] + I[:store, @index_scale]
+    end
+
+    def compile(compile_context)
+      reference.assignment_compile(compile_context) + I[:loadc, @index_scale] +
+       index.compile(compile_context) + I[:*] + I[:+] + I[:load, @index_scale]
+    end
+
+  end
+
   class Assignment < Struct.new(:left, :right)
 
     ##
@@ -356,7 +390,7 @@ module CMachineGrammar
     # The types of left and right need to match and the left side needs to be an lvalue.
 
     def compile(compile_context)
-      right.compile(compile_context) + I[:storea, left.offset, left.size]
+      right.compile(compile_context) + left.assignment_compile(compile_context)
     end
 
   end
@@ -674,7 +708,7 @@ module CMachineGrammar
     attr_reader :size, :offset
 
     def type_check(typing_context)
-      value.type_check(typing_context)
+      value.type_check(typing_context) if value
       if typing_context[variable]
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
       end
