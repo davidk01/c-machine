@@ -1,0 +1,7 @@
+(struct simple a int b int)
+
+(def main () int
+  (declare x simple)
+  (set (member x a) 1)
+  (set (member x b) 2)
+  (return (+ (member x a) (member x b))))

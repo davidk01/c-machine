@@ -80,7 +80,7 @@ module CMachineGrammar
         raise StandardError, "Unknown compound type specification."
       end
     else # non-basic type and not an array so must be a derived/declared type
-      DerivedType.new(type_specification)
+      DerivedType.new(SymbolWrapper.new(type_specification))
     end
   end
 
@@ -138,6 +138,10 @@ module CMachineGrammar
       variable_name = to_ast(s_expr[1])
       variable_value = to_ast(s_expr[2])
       Assignment.new(variable_name, variable_value)
+    when :member # (member struct-reference member-name)
+      struct_reference = to_ast(s_expr[1])
+      member_name = to_ast(s_expr[2])
+      StructMemberAccess.new(struct_reference, member_name)
     when :nth # (nth array-reference index-expr)
       array_reference = to_ast(s_expr[1])
       index_expression = to_ast(s_expr[2])

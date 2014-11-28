@@ -94,7 +94,6 @@ module CMachineGrammar
 
     ##
     # Just load the constant.
-    # :loadc self.value
 
     def compile(_); I[:loadc, value]; end
 
@@ -341,6 +340,42 @@ module CMachineGrammar
 
   end
 
+  class StructMemberAccess < Struct.new(:reference, :member)
+
+    ##
+    # TODO: A whole bunch of stuff.
+
+    def type_check(typing_context)
+      reference.type_check(typing_context)
+      if !(DerivedType === (reference_type = reference.infer_type(typing_context)))
+        raise StandardError, "Can only access members of struct types."
+      end
+      if !(SymbolWrapper === member)
+        raise StandardError, "Struct member accessor must be a name."
+      end
+      if (@member_offset = reference_type.offset(member)).nil?
+        raise StandardError, "Member undefined for given struct: #{member}."
+      end
+      @member_size = reference_type.member_type(member).size(typing_context)
+      true
+    end
+
+    def infer_type(typing_context)
+      reference.infer_type(typing_context).member_type(member)
+    end
+
+    def assignment_compile(compile_context)
+      reference.assignment_compile(compile_context) + I[:loadc, @member_offset] + I[:+] +
+       I[:store, @member_size]
+    end
+
+    def compile(compile_context)
+      reference.assignment_compile(compile_context) + I[:loadc, @member_offset] + I[:+] +
+       I[:load, @member_size]
+    end
+
+  end
+
   class ArrayIndexExpression < Struct.new(:reference, :index)
 
     def type_check(typing_context)
@@ -583,6 +618,12 @@ module CMachineGrammar
 
   class IntType < BaseType
 
+    # TODO: Don't know.
+
+    def self.type_check(typing_context)
+      true
+    end
+
     extend NumericType
 
   end
@@ -635,68 +676,85 @@ module CMachineGrammar
   class DerivedType < Struct.new(:name)
 
     ##
+    # All derived types must resolve to a struct declaration.
+
+    def type_check(typing_context)
+      if (@struct = typing_context[name]).nil?
+        raise StandardError, "Type has not been declared in this context."
+      end
+      true
+    end
+
+    def member_type(member)
+      @struct.member_type(member)
+    end
+
+    def offset(member)
+      @struct.offset(member)
+    end
+
+    ##
     # To figure out the size of a derived type we first have to look it up in the compilation
     # context and return the size of whatever struct was declared by that name.
 
-    def size(compile_context); compile_context.get_struct_data(name).size(compile_context); end
+    def size(typing_context)
+      @struct.size(typing_context)
+    end
 
   end
 
   class StructMember < Struct.new(:type, :name)
 
-    ##
-    # Size of a struct member is the size of the underlying type.
+    # TODO: Don't know.
 
-    def size(compile_context); @size ||= type.size(compile_context); end
+    def type_check(typing_context)
+      type.type_check(typing_context)
+    end
+
+    def size(typing_context); @size ||= type.size(typing_context); end
 
   end
 
   class StructDeclaration < Struct.new(:name, :members)
 
     ##
-    # Type checking a struct declaration is pretty simple because we just add information
-    # to the typing context.
-
-    def type_check(typing_context)
-      typing_context[name] = self
-    end
-
-    ##
-    # The offset for the struct members is exactly what you'd expect. It is the sum of all
-    # the members that are declared before that member and this information is computed when
-    # we compute the total size of the struct.
-    
-    def offset(compile_context, member)
-      # Call size to instantiate +@offsets+ hash and then lookup the member in the hash.
-      size(compile_context)
-      if (member_offset = @offsets[member]).nil?
-        raise StandardError, "Unknown struct member #{member} for struct #{name}."
-      end
-      member_offset
-    end
-
-    ##
-    # The size of a declared struct is the sum of the sizes of all its members and as
-    # we are computing the size of the entire struct we can also compute and save the offsets
-    # for the struct members in +@offsets+.
-
-    def size(compile_context)
-      @offsets ||= {}
-      @size ||= members.reduce(0) do |m, member|
-        @offsets[member.name] = m
-        m + member.size(compile_context)
-      end
-    end
-
-    ##
-    # Compiling struct declarations means putting information in a symbol table for the given struct.
+    # Nothing to do.
 
     def compile(compile_context)
-      if !compile_context.get_struct_data(name).nil?
-        raise StandardError, "A struct by the given name is already defined: #{name}."
-      end
-      compile_context.assign_struct_data(name, self)
       []
+    end
+
+    ##
+    # Calculate size and offsets for members and also make sure member names are unique and that
+    # a struct by the same name has not already been declared.
+
+    def type_check(typing_context)
+      if (member_names = members.map(&:name).map(&:symbol)).length != member_names.uniq.length
+        raise StandardError, "Member names must be unique: #{member_names}."
+      end
+      if typing_context[name]
+        raise StandardError, "A struct by that name already exists: #{name}."
+      end
+      typing_context[name] = self
+      members.each {|m| m.type_check(typing_context)}
+      @offsets, @member_types = {}, {}
+      @size = members.reduce(0) do |m, member|
+        @offsets[member.name] = m
+        @member_types[member.name] = member.type
+        m + member.type.size(typing_context)
+      end
+    end
+
+    def member_type(member)
+      @member_types[member]
+    end
+
+    def offset(member)
+      @offsets[member]
+    end
+
+    def size(typing_context)
+      @size
     end
 
   end
@@ -708,6 +766,7 @@ module CMachineGrammar
     attr_reader :size, :offset
 
     def type_check(typing_context)
+      type.type_check(typing_context)
       value.type_check(typing_context) if value
       if typing_context[variable]
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
@@ -723,9 +782,6 @@ module CMachineGrammar
       typing_context.latest_declaration = self
       variable.type_check(typing_context)
     end
-
-    ##
-    # TODO: Get this to work.
 
     def compile(compile_context)
       variable_initialization = I[:initvar, @size]
