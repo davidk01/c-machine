@@ -1,14 +1,7 @@
 require_relative './cmachinestack'
 require_relative './cmachineheap'
 
-##
-# The actual virtual machine class.
-
 class CMachine
-
-  ##
-  # It is important to distinguish between absolute loads and stores and relative loads and
-  # stores.
 
   ##
   # Need a convenient way to see all the instructions. Simple comment for the time being
@@ -45,12 +38,9 @@ class CMachine
   end
 
   ##
-  # Readers for most of the internal state. Will help with debugging.
+  # Readers for most of the internal state.
 
   attr_reader :code, :stack, :pc, :ir, :return, :heap
-
-  ##
-  # Set up the initial stack and registers.
   
   def initialize(c)
     @code, @stack, @pc, @ir, @return, @heap = c + Instruction[:halt] + Instruction[:call, :main],
@@ -78,17 +68,10 @@ class CMachine
       end
     end
   end
-
-  ##
-  # Retrieve next instruction and execute it.
   
   def step
-    @ir = @code[@pc += 1]
-    execute
+    @ir = @code[@pc += 1]; execute
   end
-
-  ##
-  # Instruction dispatcher.
   
   def execute
     # Debugging output.
@@ -131,27 +114,18 @@ class CMachine
       @stack.push(@ir.arguments[0])
     when :load
       starting, count = @stack.pop, @ir.arguments[0]
-      (0...count).each do |i|
-        @stack.push @stack[starting + i]
-      end
+      (0...count).each {|i| @stack.push @stack[starting + i]}
     when :store
       ending = @stack.pop + (count = @ir.arguments[0]) - 1
       address = @stack.sp
-      (0...count).each do |i|
-        @stack[ending - i] = @stack[address - i]
-      end
+      (0...count).each {|i| @stack[ending - i] = @stack[address - i]}
     when :loada
       starting, count = *@ir.arguments
-      (0...count).each do |i|
-        @stack.push @stack[starting + i]
-      end
+      (0...count).each {|i| @stack.push @stack[starting + i]}
     when :storea
       ending = @ir.arguments[0] + (count = @ir.arguments[1]) - 1
-      top_address = @stack.sp
-      (0...count).each do |i|
-        value = @stack[top_address - i]
-        @stack[ending - i] = value
-      end
+      sp = @stack.sp
+      (0...count).each {|i| @stack[ending - i] = @stack[sp - i]}
     when :jump
       @pc = @ir.arguments[0]
     when :jumpz
@@ -184,7 +158,7 @@ class CMachine
   end
 
   ##
-  # Execute all the instructions in sequence.
+  # Execute instructions until halt.
 
   def run
     step; step while @ir
