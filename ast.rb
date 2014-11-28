@@ -25,7 +25,7 @@ module CMachineGrammar
       I[:loada, @offset, @size]
     end
 
-    def assignment_compile(compile_context)
+    def lvalue(compile_context)
       I[:loadc, @offset]
     end
 
@@ -364,13 +364,12 @@ module CMachineGrammar
       reference.infer_type(typing_context).member_type(member)
     end
 
-    def assignment_compile(compile_context)
-      reference.assignment_compile(compile_context) + I[:loadc, @member_offset] + I[:+] +
-       I[:store, @member_size]
+    def lvalue(compile_context)
+      reference.lvalue(compile_context) + I[:loadc, @member_offset] + I[:+]
     end
 
     def compile(compile_context)
-      reference.assignment_compile(compile_context) + I[:loadc, @member_offset] + I[:+] +
+      reference.lvalue(compile_context) + I[:loadc, @member_offset] + I[:+] +
        I[:load, @member_size]
     end
 
@@ -394,13 +393,13 @@ module CMachineGrammar
       reference.infer_type(typing_context).type
     end
 
-    def assignment_compile(compile_context)
-      reference.assignment_compile(compile_context) + I[:loadc, @index_scale] +
-       index.compile(compile_context) + I[:*] + I[:+] + I[:store, @index_scale]
+    def lvalue(compile_context)
+      reference.lvalue(compile_context) + I[:loadc, @index_scale] +
+       index.compile(compile_context) + I[:*] + I[:+]
     end
 
     def compile(compile_context)
-      reference.assignment_compile(compile_context) + I[:loadc, @index_scale] +
+      reference.lvalue(compile_context) + I[:loadc, @index_scale] +
        index.compile(compile_context) + I[:*] + I[:+] + I[:load, @index_scale]
     end
 
@@ -419,13 +418,15 @@ module CMachineGrammar
       if left.infer_type(typing_context) != right.infer_type(typing_context)
         raise StandardError, "Non-conformant assignment."
       end
+      @size = right.infer_type(typing_context).size(typing_context)
     end
 
     ##
     # The types of left and right need to match and the left side needs to be an lvalue.
 
     def compile(compile_context)
-      right.compile(compile_context) + left.assignment_compile(compile_context)
+      right.compile(compile_context) + left.lvalue(compile_context) + I[:store, @size] +
+       I[:pop, @size]
     end
 
   end
