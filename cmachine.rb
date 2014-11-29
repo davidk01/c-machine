@@ -38,6 +38,13 @@ class CMachine
   end
 
   ##
+  # Because of my decision to separate heap and stack into distinct regions without
+  # using any registers I need to tag heap addresses. This class acts as that tag.
+
+  class HeapAddress < Struct.new(:address)
+  end
+
+  ##
   # Readers for most of the internal state.
 
   attr_reader :code, :stack, :pc, :ir, :return, :heap
@@ -104,7 +111,7 @@ class CMachine
       len = @ir.arguments[0]
       @stack.push(*[0] * len)
     when :malloc
-      starting_address = @heap.allocate(@stack.pop)
+      starting_address = HeapAddress.new(@heap.allocate(@stack.pop))
       @stack.push(starting_address)
     when :pop
       result = nil
@@ -114,16 +121,28 @@ class CMachine
       @stack.push(@ir.arguments[0])
     when :load
       starting, count = @stack.pop, @ir.arguments[0]
-      (0...count).each {|i| @stack.push @stack[starting + i]}
+      if HeapAddress === starting
+        (0...count).each {|i| @stack.push @heap[starting.address + i]}
+      else
+        (0...count).each {|i| @stack.push @stack[starting + i]}
+      end
     when :store
-      ending = @stack.pop + (count = @ir.arguments[0]) - 1
-      address = @stack.sp
-      (0...count).each {|i| @stack[ending - i] = @stack[address - i]}
+      # TODO: figure out a cleaner way to do this
+      count = @ir.arguments[0]
+      address = @stack.pop
+      if HeapAddress === address
+        ending = address.address + count - 1
+        (0...count).each {|i| @heap[ending - i] = @stack[@stack.sp - i]}
+      else
+        ending = address + count - 1
+        (0...count).each {|i| @stack[ending - i] = @stack[@stack.sp - i]}
+      end
     when :loada
       starting, count = *@ir.arguments
       (0...count).each {|i| @stack.push @stack[starting + i]}
     when :storea
-      ending = @ir.arguments[0] + (count = @ir.arguments[1]) - 1
+      count = @ir.arguments[1]
+      ending = @ir.arguments[0] + count - 1
       sp = @stack.sp
       (0...count).each {|i| @stack[ending - i] = @stack[sp - i]}
     when :jump

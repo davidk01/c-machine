@@ -487,7 +487,7 @@ module CMachineGrammar
     ##
     # For loop for(e1;e2;e3;) { s } is equivalent to e1; while (e2) { s; e3; } so we compile it as
     # init [:test] test jumpz(:end) body update jump(:test) [:end]
-    # A bit convoluted but manageable.
+    # TODO: Fix this because it is broken, specifically I[:pop, 1]
 
     def compile(compile_context)
       test_target, end_target = compile_context.get_label, compile_context.get_label
@@ -558,7 +558,7 @@ module CMachineGrammar
   class Statements < Struct.new(:statements)
 
     ##
-    # +Statements+ instances result from a block so we need to introduce a new context
+    # +Statements+ instances correspond to lexical blocks so we need to introduce a new context
     # that corresponds to the new block.
 
     def type_check(typing_context)
@@ -571,20 +571,6 @@ module CMachineGrammar
 
     def compile(compile_context)
       statements.map {|s| s.compile(compile_context)}.flatten
-    end
-
-  end
-
-  class ExpressionStatement < Struct.new(:expression)
-
-    ##
-    # Pretty simple. Compile the expression and then pop.
-    # I'm not sure if a single pop is enough. What happens when we load
-    # a compound variable on top of the stack? (TODO: Currently the stack invariant
-    # is not maintained so need to figure out the correct number of elements to pop)
-
-    def compile(compile_context)
-      expression.compile(compile_context) + I[:pop, 1]
     end
 
   end
@@ -665,6 +651,13 @@ module CMachineGrammar
   class PtrType < Struct.new(:type)
 
     ##
+    # TODO: What does it mean to type check a pointer type.
+
+    def type_check(typing_context)
+      true
+    end
+
+    ##
     # Pointers are just integers and in our VM scheme they take up just 1 memory cell.
 
     def size(_); 1; end
@@ -704,8 +697,39 @@ module CMachineGrammar
 
   end
 
+  class PointerDereference < Struct.new(:pointer_reference)
+
+    ##
+    # Make sure we are actually dealing with a pointer.
+
+    def type_check(typing_context)
+      pointer_reference.type_check(typing_context)
+      if !(PtrType === (@ptr_type = pointer_reference.infer_type(typing_context)))
+        raise StandardError, "Can not de-reference non-pointer type."
+      end
+      @pointer_value_size = @ptr_type.type.size(typing_context)
+    end
+
+    def infer_type(typing_context)
+      @ptr_type.type
+    end
+
+    ##
+    # TODO: Figure this out.
+
+    def lvalue(compile_context)
+      pointer_reference.compile(compile_context)
+    end
+
+    def compile(compile_context)
+      pointer_reference.compile(compile_context) + I[:load, @pointer_value_size]
+    end
+
+  end
+
   class StructMember < Struct.new(:type, :name)
 
+    ##
     # TODO: Don't know.
 
     def type_check(typing_context)
@@ -880,12 +904,12 @@ module CMachineGrammar
     def type_check(typing_context)
       function = typing_context[name]
       function_argument_types = function.arguments.map(&:type)
-      @arguments_size ||= function_argument_types.reduce(0) {|m, t| m + t.size(typing_context)}
       arguments.each {|arg| arg.type_check(typing_context)}
       call_argument_types = arguments.map {|arg| arg.infer_type(typing_context)}
       if !function_argument_types.zip(call_argument_types).all? {|a, b| a == b}
         raise StandardError, "Call site arguments do not match definition: #{name}."
       end
+      @arguments_size = function.arguments_size
     end
 
     ##

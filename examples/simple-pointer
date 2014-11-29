@@ -1,0 +1,4 @@
+(def main () int
+  (declare x (ptr int) (malloc (sizeof int)))
+  (set (deref x) 1)
+  (return (deref x)))
