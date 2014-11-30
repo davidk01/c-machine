@@ -42,6 +42,11 @@ class CMachine
   # using any registers I need to tag heap addresses. This class acts as that tag.
 
   class HeapAddress < Struct.new(:address)
+    
+    def to_s
+      "h#{address}"
+    end
+
     def +(other)
       self.class.new(address + other)
     end

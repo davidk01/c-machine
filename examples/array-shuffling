@@ -1,0 +1,18 @@
+(def main () int
+  (declare arr (ptr (array int 1)) (malloc 7))
+  (set (nth (deref arr) 0) 3)
+  (set (nth (deref arr) 1) 2)
+  (set (nth (deref arr) 2) 1)
+  (set (nth (deref arr) 3) 10)
+  (set (nth (deref arr) 4) 9)
+  (set (nth (deref arr) 5) 8)
+  (set (nth (deref arr) 6) 7)
+  (declare lower-arr (ptr (array int 1)) (malloc 7))
+  (declare index int 0)
+  (declare buffer-index int 0)
+  (while (< index 7) (do
+    (if (<= (nth (deref arr) index) 3) (do
+      (set (nth (deref lower-arr) buffer-index) (nth (deref arr) index))
+      (set buffer-index (+ 1 buffer-index))))
+    (set index (+ index 1))))
+  (return 0))
