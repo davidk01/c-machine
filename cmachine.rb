@@ -42,6 +42,9 @@ class CMachine
   # using any registers I need to tag heap addresses. This class acts as that tag.
 
   class HeapAddress < Struct.new(:address)
+    def +(other)
+      self.class.new(address + other)
+    end
   end
 
   ##
@@ -122,7 +125,7 @@ class CMachine
     when :load
       starting, count = @stack.pop, @ir.arguments[0]
       if HeapAddress === starting
-        (0...count).each {|i| @stack.push @heap[starting.address + i]}
+        (0...count).each {|i| @stack.push @heap.heap[starting.address + i]}
       else
         (0...count).each {|i| @stack.push @stack[starting + i]}
       end
@@ -132,7 +135,7 @@ class CMachine
       address = @stack.pop
       if HeapAddress === address
         ending = address.address + count - 1
-        (0...count).each {|i| @heap[ending - i] = @stack[@stack.sp - i]}
+        (0...count).each {|i| @heap.heap[ending - i] = @stack[@stack.sp - i]}
       else
         ending = address + count - 1
         (0...count).each {|i| @stack[ending - i] = @stack[@stack.sp - i]}
