@@ -9,6 +9,10 @@ module CMachineGrammar
 
     attr_reader :size, :offset
 
+    def to_s
+      "#{symbol}"
+    end
+
     def infer_type(typing_context)
       typing_context[self].type
     end
@@ -68,6 +72,10 @@ module CMachineGrammar
   end
 
   class ConstExp < Struct.new(:value)
+
+    def to_s
+      "#{value}"
+    end
 
     ##
     # TODO: Don't know.
@@ -212,6 +220,18 @@ module CMachineGrammar
 
   class LessExp < OpReducers
 
+    def infer_type(typing_context)
+      BoolType
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Can not compare non-numeric arguments."
+      end
+    end
+
     ##
     # e1 e2 :< e2 e3 :< e3 e4 :< ... en-1 en :< :& :& ... :&
 
@@ -221,23 +241,15 @@ module CMachineGrammar
 
   class LessEqExp < OpReducers
 
+    def infer_type(typing_context)
+      BoolType
+    end
+
     def type_check(typing_context)
       expressions.each {|e| e.type_check(typing_context)}
       expression_types = expressions.map {|e| e.infer_type(typing_context)}
       if !expression_types.all?(&:numeric?)
-        raise StandardError, "Non numeric type found for ordering comparison."
-      end
-    end
-
-    ##
-    # We can only compare numeric things.
-
-    def infer_type(typing_context)
-      expression_types = expressions.map {|e| e.infer_type(typing_context)}
-      if [IntType, FloatType].include?(expression_types.reduce(:upper_bound))
-        BoolType
-      else
-        raise StandardError, "Can not order non-numeric types."
+        raise StandardError, "Can not compare non-numeric arguments."
       end
     end
 
@@ -249,6 +261,18 @@ module CMachineGrammar
   end
 
   class EqExp < OpReducers
+
+    def infer_type(typing_context)
+      BoolType
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Can not compare non-numeric arguments."
+      end
+    end
 
     ##
     # Same as above.
@@ -279,6 +303,18 @@ module CMachineGrammar
   end
 
   class GreaterEqExp < OpReducers
+
+    def infer_type(typing_context)
+      BoolType
+    end
+
+    def type_check(typing_context)
+      expressions.each {|e| e.type_check(typing_context)}
+      expression_types = expressions.map {|e| e.infer_type(typing_context)}
+      if !expression_types.all?(&:numeric?)
+        raise StandardError, "Can not compare non-numeric arguments."
+      end
+    end
 
     ##
     # Same as above.
@@ -341,6 +377,10 @@ module CMachineGrammar
   end
 
   class StructMemberAccess < Struct.new(:reference, :member)
+
+    def to_s
+      "#{reference}.#{member}"
+    end
 
     ##
     # TODO: A whole bunch of stuff.
@@ -415,8 +455,8 @@ module CMachineGrammar
     def type_check(typing_context)
       left.type_check(typing_context)
       right.type_check(typing_context)
-      if left.infer_type(typing_context) != right.infer_type(typing_context)
-        raise StandardError, "Non-conformant assignment."
+      if (left_type = left.infer_type(typing_context)) != (right_type = right.infer_type(typing_context))
+        raise StandardError, "Non-conformant assignment: left = #{left}, right = #{right}, left type = #{left_type}, right type = #{right_type}."
       end
       @size = right.infer_type(typing_context).size(typing_context)
     end
@@ -605,6 +645,10 @@ module CMachineGrammar
 
   class IntType < BaseType
 
+    def to_s
+      "Int"
+    end
+
     # TODO: Don't know.
 
     def self.type_check(typing_context)
@@ -641,6 +685,19 @@ module CMachineGrammar
   # Semi-base types.
   class ArrayType < Struct.new(:type, :count)
 
+    def to_s
+      "array(#{type}, #{count})"
+    end
+
+    # TODO: Figure out if this is actually correct.
+
+    def type_check(typing_context)
+      if !(Integer === (c = count.value) && c > 0)
+        raise StandardError, "Array size must be a positive integer."
+      end
+      type.type_check(typing_context)
+    end
+
     ##
     # Size of an array is exactly what you'd expect it to be.
 
@@ -649,6 +706,10 @@ module CMachineGrammar
   end
 
   class PtrType < Struct.new(:type)
+
+    def to_s
+      "ptr(#{type})"
+    end
 
     ##
     # TODO: What does it mean to type check a pointer type.
@@ -668,6 +729,10 @@ module CMachineGrammar
   # Derived types.
 
   class DerivedType < Struct.new(:name)
+
+    def to_s
+      name.symbol
+    end
 
     ##
     # All derived types must resolve to a struct declaration.
@@ -794,6 +859,7 @@ module CMachineGrammar
       type.type_check(typing_context)
       value.type_check(typing_context) if value
       if typing_context[variable]
+        require 'pry'; binding.pry
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
       end
       typing_context[variable] = self
@@ -834,17 +900,18 @@ module CMachineGrammar
 
     def type_check(typing_context)
       typing_context[name] = self
-      typing_context.current_function = self
+      function_context = typing_context.increment
+      function_context.current_function = self
       offset = 0
       arguments.each do |arg|
-        arg.type_check(typing_context)
-        typing_context[arg.name] = arg
+        arg.type_check(function_context)
+        function_context[arg.name] = arg
         arg.offset = offset
-        arg.size = arg.type.size(typing_context)
+        arg.size = arg.type.size(function_context)
         offset += arg.size
       end
-      @arguments_size = arguments.map {|arg| arg.type.size(typing_context)}.reduce(&:+)
-      body.type_check(typing_context)
+      @arguments_size = arguments.map {|arg| arg.type.size(function_context)}.reduce(&:+)
+      body.type_check(function_context)
     end
 
     def compile(compile_context)
@@ -861,13 +928,29 @@ module CMachineGrammar
 
     def type_check(typing_context)
       typing_context.latest_declaration = self
+      type.type_check(typing_context)
+      if !(SymbolWrapper === name)
+        raise StandardError, "Argument name must be a symbol: #{name}."
+      end
     end
 
   end
 
-  ##
-  # Notes: No idea how this is supposed to work either. Trying to avoid frame pointers seems
-  # like a lot of hassle.
+  class Void
+
+    def self.compile(compile_context)
+      []
+    end
+
+    def self.infer_type(typing_context)
+      VoidType
+    end
+
+    def self.type_check(typing_context)
+      true
+    end
+
+  end
 
   class ReturnStatement < Struct.new(:return_expression)
   
@@ -906,8 +989,10 @@ module CMachineGrammar
       function_argument_types = function.arguments.map(&:type)
       arguments.each {|arg| arg.type_check(typing_context)}
       call_argument_types = arguments.map {|arg| arg.infer_type(typing_context)}
-      if !function_argument_types.zip(call_argument_types).all? {|a, b| a == b}
-        raise StandardError, "Call site arguments do not match definition: #{name}."
+      function_argument_types.zip(call_argument_types).each_with_index do |(a, b), i|
+        if !(a == b)
+          raise StandardError, "Call site arguments do not match definition at index #{i}: #{name}, decl type = #{a.to_s}, call types = #{b}."
+        end
       end
       @arguments_size = function.arguments_size
     end

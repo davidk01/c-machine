@@ -86,7 +86,7 @@ module CMachineGrammar
 
   @operator_map = {
    :'=' => EqExp, :< => LessExp, :+ => AddExp, :* => MultExp, :- => DiffExp, :/ => DivExp,
-   :<= => LessEqExp, :> => GreaterExp
+   :<= => LessEqExp, :> => GreaterExp, :>= => GreaterEqExp
   }
 
   ##
@@ -95,6 +95,8 @@ module CMachineGrammar
 
   def self.to_ast(s_expr)
     case s_expr
+    when :void
+      return Void
     when Symbol
       return SymbolWrapper.new(s_expr)
     when ConstExp
@@ -186,14 +188,18 @@ module CMachineGrammar
       size = to_ast(s_expr[1])
       Malloc.new(size)
     when :return # (return expression)
-      return_expression = to_ast(s_expr[1])
+      return_expression = to_ast((e = s_expr[1]).nil? ? :void : e)
       ReturnStatement.new(return_expression)
     when :+, :-, :*, :/, :>>, :<<, :^, :%, :&, :|
       elements = s_expr[1..-1].map {|e| to_ast(e)}
       @operator_map[h].new(elements)
     when :'=', :!=, :<, :>, :<=, :>=, :'&&', :'||'
       comparison_elements = s_expr[1..-1].map {|e| to_ast(e)}
-      @operator_map[h].new(comparison_elements)
+      operator_class = @operator_map[h]
+      if operator_class.nil?
+        raise StandardError, "Operator not found: #{h}."
+      end
+      operator_class.new(comparison_elements)
     else # (function arg arg ... arg)
       # If none of the above is true then it must be a function call
       function_arguments = s_expr[1..-1].map {|e| to_ast(e)}
