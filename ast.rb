@@ -122,7 +122,8 @@ module CMachineGrammar
       expressions.each {|e| e.type_check(typing_context)}
       expression_types = expressions.map {|e| e.infer_type(typing_context)}
       if !expression_types.all?(&:numeric?)
-        raise StandardError, "Can not multiply non-numeric arguments."
+        current_function = typing_context.current_function
+        raise StandardError, "Can not perform arithmetic on non-numeric arguments: function = #{current_function}."
       end
     end
 
@@ -388,14 +389,15 @@ module CMachineGrammar
 
     def type_check(typing_context)
       reference.type_check(typing_context)
+      current_function = typing_context.current_function
       if !(DerivedType === (reference_type = reference.infer_type(typing_context)))
-        raise StandardError, "Can only access members of struct types."
+        raise StandardError, "Can only access members of struct types: #{current_function} - #{self}."
       end
       if !(SymbolWrapper === member)
-        raise StandardError, "Struct member accessor must be a name."
+        raise StandardError, "Struct member accessor must be a name: #{current_function} - #{self}."
       end
       if (@member_offset = reference_type.offset(member)).nil?
-        raise StandardError, "Member undefined for given struct: #{member}."
+        raise StandardError, "Member undefined for given struct: #{current_function} - #{self}."
       end
       @member_size = reference_type.member_type(member).size(typing_context)
       true
@@ -469,7 +471,8 @@ module CMachineGrammar
       left.type_check(typing_context)
       right.type_check(typing_context)
       if (left_type = left.infer_type(typing_context)) != (right_type = right.infer_type(typing_context))
-        raise StandardError, "Non-conformant assignment: left = #{left}, right = #{right}, left type = #{left_type}, right type = #{right_type}."
+        current_function = typing_context.current_function
+        raise StandardError, "Non-conformant assignment: current function = #{current_function}, left = #{left}, right = #{right}, left type = #{left_type}, right type = #{right_type}."
       end
       @size = right.infer_type(typing_context).size(typing_context)
     end
@@ -720,6 +723,10 @@ module CMachineGrammar
 
   class PtrType < Struct.new(:type)
 
+    def numeric?
+      false
+    end
+
     def to_s
       "ptr(#{type})"
     end
@@ -744,7 +751,7 @@ module CMachineGrammar
   class DerivedType < Struct.new(:name)
 
     def to_s
-      name.symbol
+      name.symbol.to_s
     end
 
     ##
@@ -877,7 +884,9 @@ module CMachineGrammar
       typing_context[variable] = self
       if value
         if (value_type = value.infer_type(typing_context)) != type
-          raise StandardError, "Type of variable does not match type of initializer: #{variable}."
+          current_function = typing_context.current_function
+          message = "Variable init mismatch: #{current_function} - variable = #{variable}, value type = #{value_type}, variable type = #{type}."
+          raise StandardError, message
         end
       end
       latest_declaration = typing_context.latest_declaration
@@ -887,7 +896,7 @@ module CMachineGrammar
     end
 
     def compile(compile_context)
-      variable_initialization = I[:initvar, @size]
+      variable_initialization = I[:initvar, @offset, @size, variable]
       variable_assignment = value ?
        value.compile(compile_context) +
        I[:storea, @offset, @size] + I[:pop, @size] : []
@@ -903,6 +912,10 @@ module CMachineGrammar
   # this means I need to augment the context and treat each argument as a variable declaration.
 
   class FunctionDefinition < Struct.new(:return_type, :name, :arguments, :body)
+
+    def to_s
+      "#{name}"
+    end
 
     attr_reader :arguments_size
 
@@ -1007,6 +1020,7 @@ module CMachineGrammar
         end
       end
       @arguments_size = function.arguments_size
+      @function_arguments = function.arguments
     end
 
     ##
@@ -1021,7 +1035,9 @@ module CMachineGrammar
     def compile(compile_context)
       # Evaluate the arguments and then transport them to the new stack
       arguments.flat_map {|arg| arg.compile(compile_context)} +
-       I[:pushstack, @arguments_size] + I[:call, name.symbol]
+       I[:pushstack, @arguments_size] +
+       @function_arguments.flat_map {|arg| I[:arginfo, arg.name.symbol, arg.offset, arg.size]} +
+       I[:call, name.symbol]
     end
 
   end

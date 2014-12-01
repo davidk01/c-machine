@@ -9,6 +9,7 @@ class CMachine
   # :pop (decrement the stack pointer)
   # :pushstack k (add another stack on top of the current one for a function call and move k values
   #               from the current stack to the new one)
+  # :arginfo symbol offset len (argument information for debugging purposes)
   # :call label (call a function by jumping to the given label/address after saving @pc)
   # :return (jump back to a saved @pc)
   # :loadc c (push a constant on top of the stack)
@@ -85,22 +86,31 @@ class CMachine
   end
   
   def step
-    @ir = @code[@pc += 1]; execute
+    @ir = @code[@pc += 1]; execute; nil
   end
   
-  def execute
+  def debug
     # Debugging output.
     puts "Return: #{@return.map(&:to_s).join(', ')}."
+    puts "stack pointer: #{@stack.length}."
+    puts "Function arguments: #{@fp}."
     puts "Stack: #{@stack.to_s}."
     puts "Heap: #{@heap}."
     puts "Instruction: #@pc, #@ir."
     puts "-----------------"
     #########
+  end
+
+  def execute
+    debug
     case (sym = (@ir || Instruction.new(:noop, [])).instruction)
     when :halt
       raise StandardError, "Halting."
     when :label
     when :noop
+    when :arginfo
+      name, offset, size = *@ir.arguments
+      @stack.function_var_info(name, offset, size)
     when :break
       require 'pry'; binding.pry
     when :pushstack
@@ -109,6 +119,7 @@ class CMachine
       new_stack = @stack.increment
       new_stack.push(*accumulator.reverse)
       @stack = new_stack
+      @fp = new_stack.store.length
     when :return
       parent = @stack.parent
       @ir.arguments[0].times { parent.push(@stack.store.shift) }
@@ -118,8 +129,15 @@ class CMachine
       @return.push(@pc)
       @pc = @ir.arguments[0]
     when :initvar
-      len = @ir.arguments[0]
-      @stack.push(*[0] * len)
+      offset, len, name = @ir.arguments[0], @ir.arguments[1], @ir.arguments[2]
+      if offset > @stack.sp
+        len.times { @stack.push(0) }
+      elsif offset <= @stack.sp
+        (0...len).each {|i| @stack.store[offset + i] = 0}
+      else
+        raise StandardError, "This should not happen: sp = #{@stack.sp}, offset = #{offset}."
+      end
+      @stack.local_var_info(name, offset, len)
     when :malloc
       starting_address = HeapAddress.new(@heap.allocate(@stack.pop))
       @stack.push(starting_address)

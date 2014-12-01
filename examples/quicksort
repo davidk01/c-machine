@@ -1,107 +1,143 @@
-(struct buffer-and-length buffer (ptr (array int 1)) buffer-length int)
+(struct buffer-and-length
+  buffer (ptr (array int 1))
+  buffer-length (ptr int))
 
-(struct slice-and-pivot low-index int high-index int pivot int)
+(struct slice-and-pivot
+  low-index int
+  high-index int
+  pivot int)
 
-(def lower-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def lower-partition (arr (ptr (array int 1))
+ bounds-and-pivot slice-and-pivot
+ buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
   (declare buffer-index int 0)
   (declare i int 0)
-  (set (member buffer buffer-length) 0)
+  (set (deref (member buffer buffer-length)) 0)
   (while (<= (+ low i) high) (do
     (declare array-element int (nth (deref arr) (+ low i)))
     (if (< array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
-      (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
+      (set (deref (member buffer buffer-length)) (+ 1 (deref (member buffer buffer-length))))
       (set buffer-index (+ 1 buffer-index))))
     (set i (+ 1 i))))
   (return))
 
-(def middle-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def middle-partition (arr (ptr (array int 1))
+ bounds-and-pivot slice-and-pivot
+ buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
   (declare buffer-index int 0)
   (declare i int 0)
-  (set (member buffer buffer-length) 0)
+  (set (deref (member buffer buffer-length)) 0)
   (while (<= (+ low i) high) (do
     (declare array-element int (nth (deref arr) (+ low i)))
     (if (= array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
-      (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
+      (set (deref (member buffer buffer-length)) (+ 1 (deref (member buffer buffer-length))))
       (set buffer-index (+ 1 buffer-index))))
     (set i (+ 1 i))))
   (return))
 
-(def upper-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def upper-partition (arr (ptr (array int 1))
+ bounds-and-pivot slice-and-pivot
+ buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
   (declare buffer-index int 0)
   (declare i int 0)
-  (set (member buffer buffer-length) 0)
+  (set (deref (member buffer buffer-length)) 0)
   (while (<= (+ low i) high) (do
     (declare array-element int (nth (deref arr) (+ low i)))
     (if (> array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
-      (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
+      (set (deref (member buffer buffer-length)) (+ 1 (deref (member buffer buffer-length))))
       (set buffer-index (+ 1 buffer-index))))
     (set i (+ 1 i))))
   (return))
 
-(def fix-up (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot lower-buffer buffer-and-length middle-buffer buffer-and-length upper-buffer buffer-and-length) void
+(def fix-up (arr (ptr (array int 1))
+ bounds-and-pivot slice-and-pivot
+ lower-buffer buffer-and-length
+ middle-buffer buffer-and-length
+ upper-buffer buffer-and-length) void
   (declare buffer-index int 0)
   (declare array-index int (member bounds-and-pivot low-index))
-  (while (< buffer-index (member lower-buffer buffer-length)) (do
+  (while (< buffer-index (deref (member lower-buffer buffer-length))) (do
     (set (nth (deref arr) array-index) (nth (deref (member lower-buffer buffer)) buffer-index))
     (set array-index (+ 1 array-index))
     (set buffer-index (+ 1 buffer-index))))
   (set buffer-index 0)
-  (while (< buffer-index (member middle-buffer buffer-length)) (do
+  (while (< buffer-index (deref (member middle-buffer buffer-length))) (do
     (set (nth (deref arr) array-index) (nth (deref (member middle-buffer buffer)) buffer-index))
     (set array-index (+ 1 array-index))
     (set buffer-index (+ 1 buffer-index))))
   (set buffer-index 0)
-  (while (< buffer-index (member upper-buffer buffer-length)) (do
+  (while (< buffer-index (deref (member upper-buffer buffer-length))) (do
     (set (nth (deref arr) array-index) (nth (deref (member upper-buffer buffer)) buffer-index))
     (set array-index (+ 1 array-index))
     (set buffer-index (+ 1 buffer-index))))
   (return))
 
-(def quicksort (arr (ptr (array int 1)) slice slice-and-pivot lower-buffer buffer-and-length middle-buffer buffer-and-length upper-buffer buffer-and-length) void
-  (if (>= (member slice low-index) (member slice high-index)) (return))
-  (declare pivot int (/ (+ (member slice low-index) (member slice high-index)) 2))
-  (set (member slice pivot) pivot)
+(def quicksort (arr (ptr (array int 1))
+ slice slice-and-pivot
+ lower-buffer buffer-and-length
+ middle-buffer buffer-and-length
+ upper-buffer buffer-and-length) void
+  (declare low-index int (member slice low-index))
+  (declare high-index int (member slice high-index))
+  (declare pivot-index int (/ (+ low-index high-index) 2))
+  (set (member slice pivot) (nth (deref arr) pivot-index))
   (lower-partition arr slice lower-buffer)
   (middle-partition arr slice middle-buffer)
   (upper-partition arr slice upper-buffer)
   (fix-up arr slice lower-buffer middle-buffer upper-buffer)
+  (if (= (- high-index low-index) 1) (return))
   (declare lower-slice slice-and-pivot slice)
   (declare upper-slice slice-and-pivot slice)
-  (set (member lower-slice high-index) (- 1 (+ (member slice low-index) (member lower-buffer buffer-length))))
-  (set (member upper-slice low-index) (+ (member lower-slice high-index) (member middle-buffer buffer-length)))
+  (declare lower-buffer-length int (deref (member lower-buffer buffer-length)))
+  (declare middle-buffer-length int (deref (member middle-buffer buffer-length)))
+  (declare upper-buffer-length int (deref (member upper-buffer buffer-length)))
+  (set (member lower-slice high-index)
+    (- (+ low-index lower-buffer-length) 1))
+  (set (member upper-slice low-index)
+    (+ lower-buffer-length middle-buffer-length))
   (quicksort arr lower-slice lower-buffer middle-buffer upper-buffer)
   (quicksort arr upper-slice lower-buffer middle-buffer upper-buffer)
   (return))
 
 (def main () int
-  (declare arr (ptr (array int 1)) (malloc 3))
-  (set (nth (deref arr) 0) 3)
-  (set (nth (deref arr) 1) 2)
-  (set (nth (deref arr) 2) 1)
-  (declare slice (ptr slice-and-pivot) (malloc (sizeof slice-and-pivot)))
-  (set (member (deref slice) low-index) 0)
-  (set (member (deref slice) high-index) 2)
-  (declare lower-buffer (ptr (array int 1)) (malloc 3))
-  (declare middle-buffer (ptr (array int 1)) (malloc 3))
-  (declare upper-buffer (ptr (array int 1)) (malloc 3))
-  (declare lower-buffer-and-length (ptr buffer-and-length) (malloc 2))
-  (declare middle-buffer-and-length (ptr buffer-and-length) (malloc 2))
-  (declare upper-buffer-and-length (ptr buffer-and-length) (malloc 2))
-  (set (member (deref lower-buffer-and-length) buffer) lower-buffer)
-  (set (member (deref middle-buffer-and-length) buffer) middle-buffer)
-  (set (member (deref upper-buffer-and-length) buffer) upper-buffer)
-  (break)
-  (quicksort arr slice lower-buffer-and-length middle-buffer-and-length upper-buffer-and-length)
+  (declare arr (ptr (array int 1)) (malloc 5))
+  (set (nth (deref arr) 0) 13)
+  (set (nth (deref arr) 1) 12)
+  (set (nth (deref arr) 2) 11)
+  (set (nth (deref arr) 3) 10)
+  (set (nth (deref arr) 4) 9)
+  (declare slice slice-and-pivot)
+  (set (member slice low-index) 0)
+  (set (member slice high-index) 4)
+  (declare lower-buffer (ptr (array int 1)) (malloc 5))
+  (declare middle-buffer (ptr (array int 1)) (malloc 5))
+  (declare upper-buffer (ptr (array int 1)) (malloc 5))
+  (declare lower-buffer-length (ptr int) (malloc 1))
+  (declare middle-buffer-length (ptr int) (malloc 1))
+  (declare upper-buffer-length (ptr int) (malloc 1))
+  (declare lower-buffer-and-length buffer-and-length)
+  (declare middle-buffer-and-length buffer-and-length)
+  (declare upper-buffer-and-length buffer-and-length)
+  (set (member lower-buffer-and-length buffer) lower-buffer)
+  (set (member middle-buffer-and-length buffer) middle-buffer)
+  (set (member upper-buffer-and-length buffer) upper-buffer)
+  (set (member lower-buffer-and-length buffer-length) lower-buffer-length)
+  (set (member middle-buffer-and-length buffer-length) middle-buffer-length)
+  (set (member upper-buffer-and-length buffer-length) upper-buffer-length)
+  (quicksort arr slice
+   lower-buffer-and-length
+   middle-buffer-and-length
+   upper-buffer-and-length)
   (return 0))
