@@ -5,7 +5,7 @@
 (struct slice-and-pivot low-index int high-index int pivot int)
 
 ;; get all the elements strictly smaller than the pivot
-(def lower-partition (arr (array int 1) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def lower-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
@@ -13,12 +13,12 @@
   (declare i int 0)
   (set (member buffer buffer-length) 0)
   (while (<= (+ low i) high) (do
-    (declare array-element int (nth arr (+ low i)))
+    (declare array-element int (nth (deref arr) (+ low i)))
     (if (< array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
       (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
-      (set buffer-index (+ 1 buffer-index)))))
-    (set i (+ 1 i)))
+      (set buffer-index (+ 1 buffer-index))))
+    (set i (+ 1 i))))
   (return))
 
 ;;def lower-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
@@ -40,7 +40,7 @@
 ;;}
 
 ;; get all the elements equal to the pivot
-(def middle-partition (arr (array int 1) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def middle-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
@@ -48,12 +48,12 @@
   (declare i int 0)
   (set (member buffer buffer-length) 0)
   (while (<= (+ low i) high) (do
-    (declare array-element int (nth arr (+ low i)))
+    (declare array-element int (nth (deref arr) (+ low i)))
     (if (= array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
       (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
-      (set buffer-index (+ 1 buffer-index)))))
-    (set i (+ 1 i)))
+      (set buffer-index (+ 1 buffer-index))))
+    (set i (+ 1 i))))
   (return))
 
 ;;def middle-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
@@ -75,7 +75,7 @@
 ;;}
 
 ;; get all the elements strictly greater than the pivot
-(def upper-partition (arr (array int 1) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
+(def upper-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
   (declare pivot int (member bounds-and-pivot pivot))
@@ -83,12 +83,12 @@
   (declare i int 0)
   (set (member buffer buffer-length) 0)
   (while (<= (+ low i) high) (do
-    (declare array-element int (nth arr (+ low i)))
+    (declare array-element int (nth (deref arr) (+ low i)))
     (if (> array-element pivot) (do
       (set (nth (deref (member buffer buffer)) buffer-index) array-element)
       (set (member buffer buffer-length) (+ 1 (member buffer buffer-length)))
-      (set buffer-index (+ 1 buffer-index)))))
-    (set i (+ 1 i)))
+      (set buffer-index (+ 1 buffer-index))))
+    (set i (+ 1 i))))
   (return))
 
 ;;def upper-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
@@ -154,11 +154,11 @@
 ;; the actual quicksort
 (def quicksort (arr (ptr (array int 1)) slice slice-and-pivot lower-buffer buffer-and-length middle-buffer buffer-and-length upper-buffer buffer-and-length) void
   (if (>= (member slice low-index) (member slice high-index)) (return))
-  (declare pivot int (/ (member slice low-index) (member slice high-index)))
+  (declare pivot int (/ (+ (member slice low-index) (member slice high-index)) 2))
   (set (member slice pivot) pivot)
-  (lower-partition (deref arr) slice lower-buffer)
-  (middle-partition (deref arr) slice middle-buffer)
-  (upper-partition (deref arr) slice upper-buffer)
+  (lower-partition arr slice lower-buffer)
+  (middle-partition arr slice middle-buffer)
+  (upper-partition arr slice upper-buffer)
   (fix-up arr slice lower-buffer middle-buffer upper-buffer)
   (declare lower-slice slice-and-pivot slice)
   (declare upper-slice slice-and-pivot slice)

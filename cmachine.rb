@@ -101,6 +101,8 @@ class CMachine
       raise StandardError, "Halting."
     when :label
     when :noop
+    when :break
+      require 'pry'; binding.pry
     when :pushstack
       pop_count, accumulator = @ir.arguments[0], []
       pop_count.times { accumulator.push(@stack.pop) }

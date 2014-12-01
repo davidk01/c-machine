@@ -415,6 +415,18 @@ module CMachineGrammar
 
   end
 
+  class BreakStatement
+
+    def self.type_check(typing_context)
+      true
+    end
+
+    def self.compile(compile_context)
+      I[:break]
+    end
+
+  end
+
   class ArrayIndexExpression < Struct.new(:reference, :index)
 
     def type_check(typing_context)

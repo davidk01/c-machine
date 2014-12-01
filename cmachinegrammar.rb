@@ -136,6 +136,8 @@ module CMachineGrammar
       variable_type = type_resolution(s_expr[2])
       variable_value = (value = s_expr[3]).nil? ? nil : to_ast(value)
       VariableDeclaration.new(variable_type, variable_name, variable_value)
+    when :break # break statements, drops us into pry repl
+      BreakStatement
     when :set # (set variable value)
       variable_name = to_ast(s_expr[1])
       variable_value = to_ast(s_expr[2])
