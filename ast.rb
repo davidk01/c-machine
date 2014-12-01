@@ -344,6 +344,7 @@ module CMachineGrammar
   class SizeOf < Struct.new(:type)
 
     def type_check(typing_context)
+      type.type_check(typing_context)
       @size = type.size(typing_context)
     end
 
@@ -727,7 +728,7 @@ module CMachineGrammar
     # TODO: What does it mean to type check a pointer type.
 
     def type_check(typing_context)
-      true
+      type.type_check(typing_context)
     end
 
     ##
@@ -871,7 +872,6 @@ module CMachineGrammar
       type.type_check(typing_context)
       value.type_check(typing_context) if value
       if typing_context[variable]
-        require 'pry'; binding.pry
         raise StandardError, "Can not declare two variables with the same name: #{variable}."
       end
       typing_context[variable] = self

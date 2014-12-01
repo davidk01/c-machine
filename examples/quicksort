@@ -1,10 +1,7 @@
-;; scratch space pointers
 (struct buffer-and-length buffer (ptr (array int 1)) buffer-length int)
 
-;; array bounds we are focusing on
 (struct slice-and-pivot low-index int high-index int pivot int)
 
-;; get all the elements strictly smaller than the pivot
 (def lower-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
@@ -21,25 +18,6 @@
     (set i (+ 1 i))))
   (return))
 
-;;def lower-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
-;;  low = bounds-and-pivot.low-index;
-;;  high = bounds-and-pivot.high-index;
-;;  pivot = bounds-and-pivot.pivot;
-;;  i = 0;
-;;  buffer-index = 0;
-;;  buffer.buffer-length = 0;
-;;  while (low + i <= high) {
-;;    array-element = arr[low + i];
-;;    if (array-element < pivot) {
-;;      (*buffer.buffer)[buffer-index] = array-element;
-;;      buffer.buffer-length = buffer.buffer-length + 1;
-;;      buffer-index = buffer-index + 1;
-;;    }
-;;    i = i + 1;
-;;  }
-;;}
-
-;; get all the elements equal to the pivot
 (def middle-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
@@ -56,25 +34,6 @@
     (set i (+ 1 i))))
   (return))
 
-;;def middle-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
-;;  low = bounds-and-pivot.low-index;
-;;  high = bounds-and-pivot.high-index;
-;;  pivot = bounds-and-pivot.pivot;
-;;  i = 0;
-;;  buffer-index = 0;
-;;  buffer.buffer-length = 0;
-;;  while (low + i <= high) {
-;;    array-element = arr[low + i];
-;;    if (array-element == pivot) {
-;;      (*buffer.buffer)[buffer-index] = array-element;
-;;      buffer.buffer-length = buffer.buffer-length + 1;
-;;      buffer-index = buffer-index + 1;
-;;    }
-;;    i = i + 1;
-;;  }
-;;}
-
-;; get all the elements strictly greater than the pivot
 (def upper-partition (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot buffer buffer-and-length) void
   (declare low int (member bounds-and-pivot low-index))
   (declare high int (member bounds-and-pivot high-index))
@@ -91,25 +50,6 @@
     (set i (+ 1 i))))
   (return))
 
-;;def upper-partition(arr, bounds-and-pivot : slice-and-pivot, buffer : buffer-and-length) : void {
-;;  low = bounds-and-pivot.low-index;
-;;  high = bounds-and-pivot.high-index;
-;;  pivot = bounds-and-pivot.pivot;
-;;  i = 0;
-;;  buffer-index = 0;
-;;  buffer.buffer-length = 0;
-;;  while (low + i <= high) {
-;;    array-element = arr[low + i];
-;;    if (array-element > pivot) {
-;;      (*buffer.buffer)[buffer-index] = array-element;
-;;      buffer.buffer-length = buffer.buffer-length + 1;
-;;      buffer-index = buffer-index + 1;
-;;    }
-;;    i = i + 1;
-;;  }
-;;}
-
-;; re-constitute the array by shifting elements into their relatively correct positions
 (def fix-up (arr (ptr (array int 1)) bounds-and-pivot slice-and-pivot lower-buffer buffer-and-length middle-buffer buffer-and-length upper-buffer buffer-and-length) void
   (declare buffer-index int 0)
   (declare array-index int (member bounds-and-pivot low-index))
@@ -129,29 +69,6 @@
     (set buffer-index (+ 1 buffer-index))))
   (return))
 
-;;def fix-up(arr, slice-and-pivot, lower-buffer, middle-buffer, upper-buffer) {
-;;  buffer-index = 0;
-;;  array-index = slice-and-pivot.low-index;
-;;  while (buffer-index < lower-buffer.buffer-length) {
-;;    arr[array-index] = (*lower-buffer.buffer)[buffer-index]
-;;    array-index = array-index + 1;
-;;    buffer-index = buffer-index + 1;
-;;  }
-;;  buffer-index = 0;
-;;  while (buffer-index < middle-buffer.buffer-length) {
-;;    arr[array-index] = (*middle-buffer.buffer)[buffer-index]
-;;    array-index = array-index + 1;
-;;    buffer-index = buffer-index + 1;
-;;  }
-;;  buffer-index = 0;
-;;  while (buffer-index < upper-buffer.buffer-length) {
-;;    arr[array-index] = (*upper-buffer.buffer)[buffer-index]
-;;    array-index = array-index + 1;
-;;    buffer-index = buffer-index + 1;
-;;  }
-;;}
-
-;; the actual quicksort
 (def quicksort (arr (ptr (array int 1)) slice slice-and-pivot lower-buffer buffer-and-length middle-buffer buffer-and-length upper-buffer buffer-and-length) void
   (if (>= (member slice low-index) (member slice high-index)) (return))
   (declare pivot int (/ (+ (member slice low-index) (member slice high-index)) 2))
@@ -168,57 +85,23 @@
   (quicksort arr upper-slice lower-buffer middle-buffer upper-buffer)
   (return))
 
-;;def quicksort(arr, slice, lower-buffer, middle-buffer, upper-buffer) : void {
-;;  ;; base case, nothing left to do
-;;  if (slice.low-index >= slice.high-index) {
-;;    return;
-;;  }
-;;  pivot = arr[(low + high) / 2];
-;;  slice.pivot = pivot;
-;;  lower-partition(arr, slice, lower-buffer);
-;;  middle-partition(arr, slice, middle-buffer);
-;;  upper-partition(arr, slice, upper-buffer);
-;;  fix-up(arr, slice, lower-buffer, middle-buffer, upper-buffer);
-;;  ;; recursively sort the lower and upper slices
-;;  lower-slice = slice;
-;;  upper-slice = slice;
-;;  lower-slice.high-index = slice.low-index + lower-buffer.buffer-length - 1;
-;;  upper-slice.low = lower-slice.high-index + middle-buffer.buffer-length;
-;;  quicksort(arr, lower-slice, lower-buffer, middle-buffer, upper-buffer);
-;;  quicksort(arr, upper-slice, lower-buffer, middle-buffer, upper-buffer);
-;;}
-
 (def main () int
   (declare arr (ptr (array int 1)) (malloc 3))
   (set (nth (deref arr) 0) 3)
   (set (nth (deref arr) 1) 2)
   (set (nth (deref arr) 2) 1)
-  (declare slice slice-and-pivot)
-  (set (member slice low-index) 0)
-  (set (member slice high-index) 2)
+  (declare slice (ptr slice-and-pivot) (malloc (sizeof slice-and-pivot)))
+  (set (member (deref slice) low-index) 0)
+  (set (member (deref slice) high-index) 2)
   (declare lower-buffer (ptr (array int 1)) (malloc 3))
   (declare middle-buffer (ptr (array int 1)) (malloc 3))
   (declare upper-buffer (ptr (array int 1)) (malloc 3))
-  (declare lower-buffer-and-length buffer-and-length)
-  (declare middle-buffer-and-length buffer-and-length)
-  (declare upper-buffer-and-length buffer-and-length)
-  (set (member lower-buffer-and-length buffer) lower-buffer)
-  (set (member middle-buffer-and-length buffer) middle-buffer)
-  (set (member upper-buffer-and-length buffer) upper-buffer)
+  (declare lower-buffer-and-length (ptr buffer-and-length) (malloc 2))
+  (declare middle-buffer-and-length (ptr buffer-and-length) (malloc 2))
+  (declare upper-buffer-and-length (ptr buffer-and-length) (malloc 2))
+  (set (member (deref lower-buffer-and-length) buffer) lower-buffer)
+  (set (member (deref middle-buffer-and-length) buffer) middle-buffer)
+  (set (member (deref upper-buffer-and-length) buffer) upper-buffer)
+  (break)
   (quicksort arr slice lower-buffer-and-length middle-buffer-and-length upper-buffer-and-length)
   (return 0))
-
-;;def main () int {
-;;  arr : ptr(array(int, 3)) = malloc(3);
-;;  (*arr)[0] = 3;
-;;  (*arr)[1] = 2;
-;;  (*arr)[2] = 1;
-;;  slice = allocate(slice-and-pivot);
-;;  slice.low-index = 0;
-;;  slice.high-index = 2;
-;;  lower-buffer = malloc(3);
-;;  middle-buffer = malloc(3);
-;;  upper-buffer = malloc(3);
-;;  quicksort(arr, slice, lower-buffer, middle-buffer, upper-buffer);
-;;  return 0;
-;;}
