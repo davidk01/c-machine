@@ -36,6 +36,7 @@ class CMachine
 
   class Instruction < Struct.new(:instruction, :arguments)
     def self.[](instruction, *arguments); [new(instruction, arguments)]; end
+    def to_s; "#{instruction}#{arguments}"; end
   end
 
   ##

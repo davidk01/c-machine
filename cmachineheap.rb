@@ -1,5 +1,9 @@
 class Heap < Struct.new(:heap)
 
+  def to_s
+    "#{heap}"
+  end
+
   def initialize
     super([])
   end
