@@ -44,7 +44,7 @@ class CMachine
   # using any registers I need to tag heap addresses. This class acts as that tag.
 
   class HeapAddress < Struct.new(:address)
-    
+
     def to_s
       "h#{address}"
     end
@@ -52,16 +52,17 @@ class CMachine
     def +(other)
       self.class.new(address + other)
     end
+
   end
 
   ##
   # Readers for most of the internal state.
 
   attr_reader :code, :stack, :pc, :ir, :return, :heap
-  
+
   def initialize(c)
     @code, @stack, @pc, @ir, @return, @heap = c + Instruction[:halt] + Instruction[:call, :main],
-     Stack.new, c.length, nil, [], Heap.new
+      Stack.new, c.length, nil, [], Heap.new
     resolve_references
   end
 
@@ -85,11 +86,11 @@ class CMachine
       end
     end
   end
-  
+
   def step
     @ir = @code[@pc += 1]; execute; nil
   end
-  
+
   def debug
     # Debugging output.
     puts "Return: #{@return.map(&:to_s).join(', ')}."
