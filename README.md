@@ -1,0 +1,1 @@
+Free-style implementation of a VM in Ch. 2 of "Compiler Design: Virtual Machines" and a compiler for an s-expression language targeting the VM. The biggest deviations are lack of stack frames, separation of stack and heap regions, none C style function argument passing, and some extra instructions for adding meta-data to the stack layout for debugging output.
